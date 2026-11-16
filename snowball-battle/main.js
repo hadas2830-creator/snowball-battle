@@ -1,6 +1,7 @@
 /* main.js – מסכים, חדרים (2–3 שחקנים) וחיבור בין הממשק למשחק */
 (function () {
-  const COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#a855f7', '#f97316', '#ec4899', '#eab308', '#14b8a6'];
+  // שלוש הבובות: אדומה, כחולה, ירוקה – מחולקות באקראי
+  const COLORS = ['#ef4444', '#3b82f6', '#22c55e'];
   const MAX_PLAYERS = 3;
   const $ = (id) => document.getElementById(id);
   const rid = () => Math.random().toString(36).slice(2, 10);
@@ -16,7 +17,6 @@
 
   try {
     S.me.name = localStorage.getItem('sb-name') || '';
-    const c = localStorage.getItem('sb-color'); if (COLORS.includes(c)) S.me.color = c;
   } catch (e) {}
 
   /* ---------- כלים למסכים ---------- */
@@ -62,6 +62,14 @@
       e.querySelector('.ptext').textContent = names[p.type] + (p.n ? ' × ' + p.n : '');
       e.dataset.type = p.type; e.classList.add('show');
     },
+    setAmmo(n, max) {
+      const box = $('ammo'), balls = box.querySelector('.aballs');
+      if (balls.children.length !== max) { balls.innerHTML = ''; for (let i = 0; i < max; i++) balls.appendChild(el('i')); }
+      [...balls.children].forEach((b, i) => b.classList.toggle('on', i < n));
+      box.querySelector('.atext').textContent = n + '/' + max;
+      box.classList.toggle('empty', n === 0);
+      box.classList.toggle('low', n > 0 && n <= 3);
+    },
     showHint() {
       if (UI._hinted) return; UI._hinted = true;
       const h = $('hint'); h.classList.add('show'); setTimeout(() => h.classList.remove('show'), 6500);
@@ -88,6 +96,7 @@
       });
       $('btn-again').onclick = () => {
         Sfx.click();
+        if (S.botMode) return startBotMatch();
         if (S.players.length < 2) return toast('אין עוד שחקנים בחדר');
         if (S.isHost) startMatch();
         else { Net.send('rematch', {}); $('btn-again').disabled = true; $('again-msg').textContent = 'ממתינים לשאר השחקנים…'; }
@@ -97,31 +106,18 @@
   };
 
   /* ---------- מסך פתיחה ---------- */
-  const nameInput = $('name'), codeInput = $('code');
+  const nameInput = $('name');
   nameInput.value = S.me.name;
-  const colorsEl = $('colors');
-  COLORS.forEach(c => {
-    const b = document.createElement('button');
-    b.type = 'button'; b.className = 'swatch'; b.style.setProperty('--c', c);
-    b.setAttribute('aria-label', 'צבע ' + c);
-    b.onclick = () => { S.me.color = c; Sfx.unlock(); Sfx.click(); markColor(); };
-    colorsEl.appendChild(b);
-  });
-  function markColor() {
-    [...colorsEl.children].forEach((b, i) => b.classList.toggle('sel', COLORS[i] === S.me.color));
-  }
-  markColor();
+  // אין בחירת דמות: כל סיבוב הבובות מחולקות באקראי
+  const shuffle = (arr) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  S.me.color = COLORS[Math.floor(Math.random() * COLORS.length)];
 
-  const params = new URLSearchParams(location.search);
-  const urlRoom = (params.get('room') || '').replace(/\D/g, '').slice(0, 4);
-  if (urlRoom.length === 4) { codeInput.value = urlRoom; $('join-hint').textContent = 'קיבלת הזמנה לחדר ' + urlRoom + ' – רק לכתוב שם וללחוץ "הצטרפות"'; }
-  codeInput.addEventListener('input', () => { codeInput.value = codeInput.value.replace(/\D/g, '').slice(0, 4); });
 
   function readName() {
     const n = nameInput.value.trim().slice(0, 12);
     if (!n) { $('home-msg').textContent = 'רגע, איך קוראים לך? 🙂'; nameInput.focus(); return null; }
     S.me.name = n;
-    try { localStorage.setItem('sb-name', n); localStorage.setItem('sb-color', S.me.color); } catch (e) {}
+    try { localStorage.setItem('sb-name', n); } catch (e) {}
     return n;
   }
 
@@ -178,19 +174,11 @@
     if (!configured || !readName()) return;
     enterRoom(String(1000 + Math.floor(Math.random() * 9000)), 'host');
   };
-  $('btn-join').onclick = () => {
-    Sfx.unlock(); Sfx.click();
-    if (!configured || !readName()) return;
-    const code = codeInput.value;
-    if (code.length !== 4) { $('home-msg').textContent = 'קוד החדר הוא 4 ספרות'; codeInput.focus(); return; }
-    enterRoom(code, 'guest');
-  };
-  codeInput.addEventListener('keydown', e => { if (e.key === 'Enter') $('btn-join').click(); });
 
   /* ---------- חדר ---------- */
   function enterRoom(code, role) {
     $('home-msg').textContent = '';
-    Object.assign(S, { code, role, players: [], roster: null, inMatch: false, matchBusy: false, isHost: false, joinedAt: Date.now() });
+    Object.assign(S, { code, role, players: [], roster: null, inMatch: false, matchBusy: false, isHost: false, botMode: false, joinedAt: Date.now() });
     $('room-code').textContent = code;
     $('wait-title').textContent = role === 'host' ? 'החדר שלך מוכן!' : 'נכנסים לחדר ' + code;
     $('btn-copy').hidden = !/^https?:/.test(location.protocol);
@@ -269,13 +257,8 @@
   /* המארח מתחיל סיבוב עם כל מי שבחדר */
   function startMatch() {
     if (!S.isHost || S.players.length < 2) return;
-    const used = [];
-    const roster = S.players.slice(0, MAX_PLAYERS).map(p => {
-      let color = COLORS.includes(p.color) ? p.color : COLORS[0];
-      if (used.includes(color)) color = COLORS.find(c => !used.includes(c));
-      used.push(color);
-      return { id: p.id, name: cleanName(p.name), color };
-    });
+    const colors = shuffle(COLORS); // בובה אקראית לכל שחקן, בלי כפילויות
+    const roster = S.players.slice(0, MAX_PLAYERS).map((p, i) => ({ id: p.id, name: cleanName(p.name), color: colors[i] }));
     Net.send('start', { r: roster });
     beginMatch(roster);
   }
@@ -311,7 +294,6 @@
       for (let k = 0; k < 5; k++) pips.appendChild(el('i'));
       card.append(el('span', 'dot'), el('span', 'pname', r.name), pips);
       hud.appendChild(card);
-      if (i === 0) hud.appendChild(el('div', 'goal', 'ראשון ל-5 מנצח'));
     });
   }
 
@@ -347,11 +329,49 @@
   function leaveRoom() {
     Net.unannounce();
     Net.leave(); Arena.stop(); overlay(null);
-    Object.assign(S, { players: [], roster: null, inMatch: false, matchBusy: false, code: null, isHost: false });
+    Object.assign(S, { players: [], roster: null, inMatch: false, matchBusy: false, code: null, isHost: false, botMode: false });
     show('home');
   }
 
+  /* ---------- אימון נגד המחשב (בלי אינטרנט, בלי חדר) ---------- */
+  const BOT_ID = 'bot';
+  function startBotMatch() {
+    Net.unannounce(); Net.leave();
+    const [myColor, botColor] = shuffle(COLORS);
+    const roster = [
+      { id: S.me.id, name: cleanName(S.me.name), color: myColor },
+      { id: BOT_ID, name: 'רובוט השלג 🤖', color: botColor }
+    ];
+    Object.assign(S, { botMode: true, code: null, players: [], roster, inMatch: true, matchBusy: false, isHost: true });
+    overlay(null);
+    Arena.setupMatch({
+      roster: roster.map(r => ({ id: r.id, name: r.name, colorNum: parseInt(r.color.slice(1), 16) })),
+      meId: S.me.id, isHost: true, send: () => {}, bot: BOT_ID
+    });
+    buildHud(roster);
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    show('game');
+    Sfx.startMusic();
+    Arena.startRound();
+  }
+  $('btn-bot').onclick = () => {
+    Sfx.unlock(); Sfx.click();
+    if (!readName()) return;
+    $('home-msg').textContent = '';
+    startBotMatch();
+  };
+
   $('btn-start').onclick = () => { Sfx.click(); startMatch(); };
+
+  // חלון הוראות המשחק
+  $('btn-rules').onclick = () => {
+    Sfx.unlock(); Sfx.click();
+    overlay($('rules-tpl').innerHTML);
+    $('btn-rules-close').onclick = () => { Sfx.click(); overlay(null); };
+    $('btn-rules-close').focus();
+  };
+  $('overlay').addEventListener('click', (e) => { if (e.target.id === 'overlay' && $('btn-rules-close')) overlay(null); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('btn-rules-close')) overlay(null); });
   $('btn-back').onclick = () => { Sfx.click(); leaveRoom(); };
   $('btn-copy').onclick = () => {
     const url = location.origin + location.pathname + '?room=' + S.code;

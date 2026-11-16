@@ -186,6 +186,10 @@ window.Sfx = (function () {
     beep() { tone(660, 0.16, { type: 'square', vol: 0.07 }); },
     go() { tone(990, 0.35, { type: 'square', vol: 0.07 }); tone(1320, 0.4, { type: 'triangle', vol: 0.09 }); },
     click() { tone(880, 0.06, { type: 'triangle', vol: 0.08 }); },
+    // טעינה במכונה: צליל קטן שעולה עם כל כדור
+    reload(n) { tone(420 + n * 55, 0.07, { type: 'triangle', vol: 0.09 }); noise(0.05, { vol: 0.05, freq: 3000, type: 'highpass' }); },
+    // אין כדורים: "קליק" עמום
+    empty() { tone(140, 0.09, { type: 'square', vol: 0.06, to: 90 }); noise(0.04, { vol: 0.08, freq: 600, type: 'lowpass' }); },
     win() {
       [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.3, { type: 'triangle', vol: 0.16, delay: i * 0.12 }));
       [523, 659, 784].forEach(f => tone(f * 2, 0.9, { type: 'sine', vol: 0.07, delay: 0.5 }));

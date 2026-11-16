@@ -7,6 +7,9 @@
   const B = { x1: 30 * S, x2: 998 * S, y1: 60 * S, y2: 518 * S };
   const SPEED = 270, BALL_SPEED = 780, BALL_RANGE = 820, COOLDOWN = 420, WIN_SCORE = 5;
   const PLAYER_R = 15, PS = 0.34;
+  // הבובות: תמונה בגובה 150 פיקסלים, מוצגת בגובה ~75
+  const DOLL_SCALE = 0.5;
+  const DOLL_BY_COLOR = { 0xef4444: 'doll_red', 0x3b82f6: 'doll_blue', 0x22c55e: 'doll_green' };
   // גודל הגוף לצורך פגיעה: חצי רוחב המעיל (בלי הידיים), ועומק קטן על הקרקע
   const BODY_RX = 16, BODY_RY = 9;
 
@@ -23,8 +26,17 @@
     return false;
   }
   // נקודות התחלה לשחקן 1, 2, 3
-  const SPAWNS = [{ x: 150 * S, y: 345 * S }, { x: 880 * S, y: 300 * S }, { x: 600 * S, y: 400 * S }];
-  const SEND_EVERY = 66;
+  const SPAWNS = [{ x: 150 * S, y: 345 * S }, { x: 880 * S, y: 300 * S }, { x: 690 * S, y: 200 * S }];
+  // תחמושת: 10 כדורים, ומכונה באמצע שממלאת כדור כל 0.15 שנייה כשעומדים לידה
+  const MAX_AMMO = 10, RELOAD_EVERY = 150, RELOAD_FROM = 3; // אפשר להטעין כשנשארו 3 כדורים או פחות
+  const MACHINE = { x: 505 * S, y: 420 * S }; // מתחת לבקתה, עם מעבר ביניהם
+  // אזור הטעינה (אליפסה סביב המכונה) – קטן מספיק כדי לא לגלוש לאגם
+  const ZONE = { rx: 60, ry: 32, dy: -8 };
+  // כמה פעמים בשנייה שולחים מיקום, וכמה "החלקה" מוסיפים (במילישניות):
+  // 2 שחקנים – 20 פעמים בשנייה; 3 שחקנים – 15 (כדי לא לעבור את המגבלה של Supabase החינמי)
+  const NET = { 2: { send: 50, delay: 90 }, 3: { send: 66, delay: 110 } };
+  // רמת הרובוט (רמה גבוהה): זמן תגובה, דיוק, מרחק שהוא שומר, והפסקה נוספת בין זריקות
+  const BOT = { react: 0.23, aimError: 0.09, dodgeMargin: 9, keepDist: 300, extraCooldown: 330, speed: 0.8 };
 
   /* מכשולים – לפי המקומות שלהם בציור */
   const circle = (x, y, r) => ({ c: true, x: x * S, y: y * S, r: r * S });
@@ -40,7 +52,9 @@
     // בקתה
     rect(432, 282, 578, 348),
     // סלעים
-    rect(188, 372, 250, 402), rect(758, 203, 822, 237)
+    rect(188, 372, 250, 402), rect(758, 203, 822, 237),
+    // מכונת הכדורים
+    rect(482, 406, 528, 421)
   ];
   const PONDS = [{ x: 502 * S, y: 135 * S, rx: 100 * S, ry: 35 * S }, { x: 503 * S, y: 483 * S, rx: 127 * S, ry: 40 * S }];
   const CHIMNEY = { x: 541 * S, y: 218 * S };
@@ -252,6 +266,24 @@
       this.add.image(0, 0, 'arena').setOrigin(0).setDisplaySize(W, H).setDepth(-100);
       try { buildCutouts(this, Arena.images.arena); } catch (e) { console.warn('cutouts failed', e); }
 
+      // מכונת הכדורים: אזור טעינה זוהר על הקרקע + המכונה + חץ שמופיע כשנגמרים הכדורים
+      const zone = this.machineZone = this.add.ellipse(MACHINE.x, MACHINE.y + ZONE.dy, ZONE.rx * 2, ZONE.ry * 2, 0x7fd4ff, 0.22)
+        .setStrokeStyle(2.5, 0xffffff, 0.8).setDepth(-55).setVisible(false);
+      this.tweens.add({ targets: zone, alpha: 0.55, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      this.add.image(MACHINE.x, MACHINE.y + 3, 'shadow').setScale(1.5, 0.9).setDepth(-50);
+      this.machineImg = this.add.image(MACHINE.x, MACHINE.y + 2, 'machine').setOrigin(0.5, 0.98).setScale(0.5).setDepth(MACHINE.y);
+      this.add.particles(MACHINE.x, MACHINE.y - 80, 'flake', {
+        x: { min: -18, max: 18 }, speedY: { min: -30, max: -10 }, lifespan: 1200, scale: { start: 0.5, end: 0 }, alpha: { start: 0.9, end: 0 }, frequency: 220
+      }).setDepth(MACHINE.y + 1);
+      this.machineArrow = this.add.text(MACHINE.x, MACHINE.y - 118, '⬇ כדורים כאן', {
+        fontFamily: 'Rubik, Arial, sans-serif', fontSize: '20px', fontStyle: '900', color: '#ffe066', stroke: '#1b2a4a', strokeThickness: 6, rtl: true
+      }).setOrigin(0.5).setDepth(9200).setVisible(false);
+      this.tweens.add({ targets: this.machineArrow, y: MACHINE.y - 106, duration: 420, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      // מנעול מעל המכונה כשאי אפשר להטעין
+      this.machineLock = this.add.text(MACHINE.x, MACHINE.y - 112, '🔒', { fontSize: '34px', padding: { y: 6 } })
+        .setOrigin(0.5).setDepth(9200).setVisible(false);
+      this.tweens.add({ targets: this.machineLock, y: MACHINE.y - 104, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+
       // עשן מהארובה
       this.add.particles(CHIMNEY.x, CHIMNEY.y, 'smoke', {
         lifespan: 3200, speedY: { min: -38, max: -22 }, speedX: { min: 4, max: 16 },
@@ -285,10 +317,10 @@
       const ring = this.add.image(0, 2, 'ring').setTint(color).setAlpha(isMe ? 0.9 : 0.55).setScale(0.75);
       const shadow = this.add.image(0, 3, 'shadow').setScale(0.95, 0.75);
       const body = this.add.container(0, 0);
-      const mk = (k) => this.add.image(0, 0, k).setOrigin(0.5, 1).setScale(PS);
-      const back = mk('p_back'), coat = mk('p_coat').setTint(darker(color, 0.82)), face = mk('p_face'), hat = mk('p_hat').setTint(color);
-      const ice = mk('ice').setVisible(false).setScale(PS * 1.05);
-      body.add([back, coat, face, hat, ice]);
+      // הבובה לפי הצבע שנבחר (אדום / כחול / ירוק)
+      const face = this.add.image(0, 2, DOLL_BY_COLOR[color] || 'doll_red').setOrigin(0.5, 1).setScale(DOLL_SCALE);
+      const ice = this.add.image(0, 2, 'ice').setOrigin(0.5, 1).setScale(PS * 1.1).setVisible(false).setAlpha(0.85);
+      body.add([face, ice]);
       const bubble = this.add.image(0, -33, 'bubble').setScale(0.72).setVisible(false);
       const label = this.add.text(0, -84, info.name, {
         fontFamily: 'Rubik, Arial, sans-serif', fontSize: '18px', fontStyle: '700', color: '#ffffff',
@@ -315,6 +347,7 @@
       this.pus.forEach(p => p.c.destroy()); this.pus.clear();
       this.prints.forEach(p => p.destroy()); this.prints = [];
       this.mode = 'idle'; this.aimArrow.setVisible(false); this.input.keyboard.clearCaptures();
+      if (this.machineZone) { this.machineArrow.setVisible(false); this.machineLock.setVisible(false); this.machineImg.clearTint().setAlpha(1); this.machineLocked = false; }
       this.slow = 1; this.tweens.timeScale = 1;
       if (this.confetti) { this.confetti.destroy(); this.confetti = null; }
     }
@@ -325,8 +358,13 @@
       this.isHost = o.isHost; this.send = o.send;
       this.meId = o.meId;
       this.roster = o.roster.map(r => r.id);
+      const net = NET[this.roster.length >= 3 ? 3 : 2];
+      this.sendEvery = net.send; this.renderDelay = net.delay;
       o.roster.forEach(r => { this.players[r.id] = this.makePlayer(r, r.id === this.meId); });
       this.me = this.players[this.meId];
+      // מצב אימון: שחקן שהמחשב משחק בו
+      this.botId = o.bot || null;
+      if (this.botId && this.players[this.botId]) this.players[this.botId].isBot = true;
       // בזמן משחק: חצים ורווח שייכים למשחק (לא מגללים ולא לוחצים על כפתורים)
       this.input.keyboard.addCapture('SPACE,UP,DOWN,LEFT,RIGHT');
       this.scores = {};
@@ -340,7 +378,7 @@
       this.roster.forEach((id, i) => {
         const p = this.players[id]; if (!p) return;
         const s = SPAWNS[i % SPAWNS.length];
-        Object.assign(p, { x: s.x, y: s.y, vx: 0, vy: 0, snaps: [], stunUntil: 0, invulnUntil: 0, shieldUntil: 0, shieldRemote: false, power: null, lastPrint: null });
+        Object.assign(p, { x: s.x, y: s.y, vx: 0, vy: 0, snaps: [], stunUntil: 0, invulnUntil: 0, shieldUntil: 0, shieldRemote: false, power: null, lastPrint: null, nextThrow: 0, strafeUntil: 0, unstickUntil: 0, stuckSince: 0, ammo: MAX_AMMO, nextReload: 0 });
         p.aim = s.x < W / 2 ? 0 : Math.PI;
         p.ice.setVisible(false); p.bubble.setVisible(false); p.c.setPosition(p.x, p.y);
       });
@@ -364,7 +402,7 @@
       if (this.confetti) { this.confetti.destroy(); this.confetti = null; }
       this.slow = 1; this.tweens.timeScale = 1;
       this.roster.forEach(id => { this.scores[id] = 0; });
-      this.pushScores(); UI.setPower(null);
+      this.pushScores(); UI.setPower(null); UI.setAmmo(MAX_AMMO, MAX_AMMO);
       this.placeAtSpawn();
       this.mode = 'countdown';
       this.ballSeq = 0; this.puSeq = 0; this.nextPu = 0;
@@ -384,7 +422,7 @@
       const t = now();
       if (this.me) {
         this.updateMe(dt, t);
-        this.others().forEach(p => this.updateRemote(p, t));
+        this.others().forEach(p => p.isBot ? this.updateBot(p, dt, t) : this.updateRemote(p, t));
         this.updateBalls(dt, t);
         this.updatePus(t);
         Object.values(this.players).forEach(p => this.animate(p, dt, t));
@@ -405,6 +443,13 @@
       p.x += p.vx * dt; p.y += p.vy * dt;
       resolve(p);
       p.moving = Math.hypot(p.vx, p.vy) > 40;
+      this.reloadAt(p, t);
+      // מנעול + מכונה אפורה = אי אפשר להטעין עכשיו (יותר מ-3 כדורים). כשאפשר – המנעול נעלם והמכונה נדלקת
+      const locked = this.mode === 'play' && p.ammo > RELOAD_FROM && !p.refilling;
+      if (locked !== this.machineLocked) {
+        this.machineLocked = locked;
+        if (locked) this.machineImg.setTint(0x8f99aa).setAlpha(0.8); else this.machineImg.clearTint().setAlpha(1);
+      }
 
       // כיוון הזריקה = הכיוון שהולכים אליו (או האחרון שהלכו אליו)
       if ((ix || iy) && canMove) p.aim = Math.atan2(iy, ix);
@@ -415,7 +460,7 @@
 
       if (k.SPACE.isDown && this.mode === 'play' && t > p.stunUntil && t >= p.nextThrow) this.throwBall(t);
 
-      if (t - (this.lastSend || 0) > SEND_EVERY && (this.mode === 'play' || this.mode === 'countdown')) {
+      if (t - (this.lastSend || 0) > this.sendEvery && (this.mode === 'play' || this.mode === 'countdown')) {
         this.lastSend = t;
         this.send('st', { x: Math.round(p.x), y: Math.round(p.y), a: Math.round(p.aim * 100) / 100, m: p.moving ? 1 : 0, sh: t < p.shieldUntil ? 1 : 0 });
       }
@@ -424,12 +469,13 @@
     updateRemote(p, t) {
       const s = p.snaps;
       if (!s.length) return;
-      const rt = t - 110;
+      const rt = t - this.renderDelay; // מציגים את השחקן מעט "באיחור" כדי שהתנועה תהיה חלקה
       let a = s[0], b = s[s.length - 1];
       for (let i = s.length - 1; i >= 0; i--) { if (s[i].t <= rt) { a = s[i]; b = s[i + 1] || s[i]; break; } }
       const span = b.t - a.t;
       const k = span > 0 ? Math.min(1, Math.max(0, (rt - a.t) / span)) : 1;
       const px = p.x, py = p.y;
+      // רק מיקומים אמיתיים שהגיעו מהמחשב השני – בלי ניחושים
       p.x = a.x + (b.x - a.x) * k; p.y = a.y + (b.y - a.y) * k;
       let da = b.a - a.a; if (da > Math.PI) da -= Math.PI * 2; if (da < -Math.PI) da += Math.PI * 2;
       p.aim = a.a + da * k;
@@ -481,9 +527,173 @@
       if (Math.random() < 0.35) this.puff(p.x, p.y, 3, 0.35);
     }
 
+    /* ---------- מכונת הכדורים ---------- */
+    // המכונה עובדת רק כשנשארו 3 כדורים או פחות, וממלאת עד 10 (אם יוצאים באמצע – נשאר מה שנטען)
+    reloadAt(p, t) {
+      if (this.mode !== 'play') return;
+      const zx = (p.x - MACHINE.x) / ZONE.rx, zy = (p.y - (MACHINE.y + ZONE.dy)) / ZONE.ry;
+      const inZone = zx * zx + zy * zy <= 1;
+      if (!inZone) { p.refilling = false; p.zoneWarned = false; return; }
+      if (!p.refilling) {
+        if (p.ammo > RELOAD_FROM) {
+          return;
+        }
+        p.refilling = true;
+      }
+      if (p.ammo >= MAX_AMMO) { p.refilling = false; return; }
+      if (t < p.nextReload) return;
+      p.ammo++; p.nextReload = t + RELOAD_EVERY;
+      if (p.ammo >= MAX_AMMO) p.refilling = false;
+      if (p.isMe) {
+        UI.setAmmo(p.ammo, MAX_AMMO); Sfx.reload(p.ammo);
+        if (p.ammo === MAX_AMMO) { p.zoneWarned = true; this.floatText(p.x, p.y - 100, 'מלא! 10 כדורים', '#9ff0ff'); }
+      }
+      this.puff(MACHINE.x, MACHINE.y - 40, 2, 0.4);
+    }
+
+    /* ---------- הרובוט (מצב אימון) ---------- */
+    // האם יש קו ישר (בלי עצים/בקתה/חומות) בין שתי נקודות
+    lineClear(x1, y1, x2, y2) {
+      const d = dist(x1, y1, x2, y2), n = Math.ceil(d / 12);
+      for (let i = 2; i < n; i++) {
+        const x = x1 + (x2 - x1) * i / n, y = y1 + (y2 - y1) * i / n;
+        if (ballBlocked(x, y, 9.5)) return false;
+      }
+      return true;
+    }
+
+    updateBot(p, dt, t) {
+      const me = this.me;
+      const canAct = this.mode === 'play' && t > p.stunUntil;
+      let dx = 0, dy = 0;
+      const d = dist(p.x, p.y, me.x, me.y) || 1;
+      const clear = this.lineClear(p.x, p.y, me.x, me.y);
+
+      if (canAct) {
+        // 1. התחמקות: מחפשים כדור שעומד לעבור קרוב (אחרי זמן תגובה של "אדם מהיר")
+        let dodge = null, soonest = 1;
+        this.balls.forEach(b => {
+          if (b.owner === p.id || b.t < BOT.react) return;
+          const vv = b.vx * b.vx + b.vy * b.vy;
+          const tc = ((p.x - b.x) * b.vx + (p.y - b.y) * b.vy) / vv; // מתי הכדור הכי קרוב
+          if (tc < 0 || tc > 0.7 || tc > b.life - b.t) return;
+          const cx = b.x + b.vx * tc - p.x, cy = b.y + b.vy * tc - p.y;
+          const rr = BODY_RX + b.r + BOT.dodgeMargin;
+          if (cx * cx + cy * cy < rr * rr && tc < soonest) {
+            soonest = tc;
+            let ux = -cx, uy = -cy;
+            if (Math.hypot(ux, uy) < 4) { ux = -b.vy; uy = b.vx; if ((p.strafeDir || 1) < 0) { ux = -ux; uy = -uy; } }
+            dodge = [ux, uy];
+          }
+        });
+        if (p.ammo === 0 || (p.ammo <= RELOAD_FROM && d > 320)) p.reloading = true;
+        if (p.ammo >= MAX_AMMO) p.reloading = false;
+        if (dodge) { dx = dodge[0]; dy = dodge[1]; }
+        else if (p.reloading) { // הולכים למכונה ועומדים מולה עד שמתמלא
+          const fx = MACHINE.x, fy = MACHINE.y - 36; // עומדים מאחורי המכונה (מלפנים יש אגם)
+          if (dist(p.x, p.y, fx, fy) > 14) { dx = fx - p.x; dy = fy - p.y; }
+        }
+        else {
+          // 2. בונוס קרוב – רצים אליו אם הרובוט מגיע לפני השחקנית
+          let goal = null;
+          this.pus.forEach(pu => {
+            if (pu.taken) return;
+            const mine = dist(p.x, p.y, pu.x, pu.y);
+            if (mine < 480 && mine < dist(me.x, me.y, pu.x, pu.y) + 80) goal = pu;
+          });
+          if (goal) { dx = goal.x - p.x; dy = goal.y - p.y; }
+          else {
+            // 3. שומרים מרחק טוב וזזים מצד לצד; אם יש עץ באמצע – מתקרבים ומחפשים זווית
+            const ux = (me.x - p.x) / d, uy = (me.y - p.y) / d;
+            const want = clear ? BOT.keepDist : 170;
+            const radial = d > want + 70 ? 1 : d < want - 70 ? -1 : 0;
+            if (t > p.strafeUntil) { p.strafeDir = Math.random() < 0.5 ? -1 : 1; p.strafeUntil = t + 500 + Math.random() * 900; }
+            dx = ux * radial - uy * p.strafeDir * 0.9;
+            dy = uy * radial + ux * p.strafeDir * 0.9;
+          }
+        }
+        // נתקע בקיר? בוחרים כיוון אחר לרגע
+        if (t < p.unstickUntil) { dx = p.unstickX; dy = p.unstickY; }
+      }
+
+      // תנועה – אותם חוקים כמו לשחקנית (כולל החלקה על הקרח)
+      const len = Math.hypot(dx, dy) || 1; dx /= len; dy /= len;
+      const ice = inPond(p.x, p.y);
+      const f = 1 - Math.exp(-(ice ? 2.4 : 15) * dt);
+      const sp = canAct && (dx || dy) ? SPEED * BOT.speed * (ice ? 1.15 : 1) : 0;
+      p.vx += (dx * sp - p.vx) * f; p.vy += (dy * sp - p.vy) * f;
+      const ox = p.x, oy = p.y;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      resolve(p);
+      p.moving = Math.hypot(p.vx, p.vy) > 40;
+      this.reloadAt(p, t);
+      if (canAct && sp && dist(ox, oy, p.x, p.y) < SPEED * dt * 0.25) {
+        if (!p.stuckSince) p.stuckSince = t;
+        if (t - p.stuckSince > 250) {
+          const a = Math.random() * Math.PI * 2;
+          p.unstickX = Math.cos(a); p.unstickY = Math.sin(a); p.unstickUntil = t + 450; p.stuckSince = 0;
+        }
+      } else p.stuckSince = 0;
+      p.shieldRemote = t < p.shieldUntil;
+
+      // כיוון וזריקה: מכוונים למקום שבו השחקנית תהיה כשהכדור יגיע
+      if (!canAct) return;
+      const big = p.power && p.power.type === 'big';
+      const S = BALL_SPEED * (big ? 0.82 : 1);
+      const Dx = me.x - p.x, Dy = me.y - p.y;
+      const a2 = me.vx * me.vx + me.vy * me.vy - S * S, b2 = 2 * (Dx * me.vx + Dy * me.vy), c2 = Dx * Dx + Dy * Dy;
+      let ti = d / S;
+      const disc = b2 * b2 - 4 * a2 * c2;
+      if (disc >= 0 && a2 !== 0) {
+        const r1 = (-b2 - Math.sqrt(disc)) / (2 * a2), r2 = (-b2 + Math.sqrt(disc)) / (2 * a2);
+        const best = [r1, r2].filter(x => x > 0).sort((x, y) => x - y)[0];
+        if (best) ti = best;
+      }
+      const tx = me.x + me.vx * ti, ty = me.y + me.vy * ti;
+      p.aim = Math.atan2(ty - p.y, tx - p.x) + (Math.random() - 0.5) * BOT.aimError;
+      const inRange = dist(p.x, p.y, tx, ty) < BALL_RANGE * 0.85;
+      if (t >= p.nextThrow && inRange && this.lineClear(p.x, p.y, tx, ty) && t > me.invulnUntil - 150) this.botThrow(p, t);
+    }
+
+    botThrow(p, t) {
+      if (p.ammo <= 0) return;
+      p.ammo--;
+      p.nextThrow = t + COOLDOWN + Math.random() * BOT.extraCooldown;
+      p.punch = 1;
+      let big = false, angles = [p.aim];
+      if (p.power) {
+        if (p.power.type === 'big') big = true;
+        if (p.power.type === 'triple') angles = [p.aim - 0.2, p.aim, p.aim + 0.2];
+        if (--p.power.n <= 0) p.power = null;
+      }
+      angles.forEach(a => this.spawnBall({
+        id: 'bot' + (++this.ballSeq), x: Math.round(p.x + Math.cos(a) * 22), y: Math.round(p.y + Math.sin(a) * 14),
+        a, big: big ? 1 : 0
+      }, p.id));
+      Sfx.throw();
+    }
+
+    botHit(o, b, t) {
+      if (t < o.shieldUntil) {
+        this.removeBall(b, 'block'); this.flashBubble(o); Sfx.block();
+        this.floatText(o.x, o.y - 100, 'נחסם!', '#7fe3ff');
+        return;
+      }
+      o.vx = b.vx * 0.35; o.vy = b.vy * 0.35;
+      // בדיוק כמו פגיעה שמגיעה ממחשב אחר
+      this.onMessage('hit', { id: b.id, by: this.meId }, o.id);
+    }
+
     /* ---------- כדורים ---------- */
     throwBall(t) {
       const p = this.me;
+      if (p.ammo <= 0) { // נגמרו הכדורים
+        p.nextThrow = t + 600; Sfx.empty();
+        this.floatText(p.x, p.y - 100, 'נגמרו הכדורים!', '#ffb4b4');
+        UI.setAmmo(0, MAX_AMMO, true);
+        return;
+      }
+      p.ammo--; UI.setAmmo(p.ammo, MAX_AMMO);
       p.nextThrow = t + COOLDOWN; p.punch = 1;
       let big = false, angles = [p.aim];
       if (p.power) {
@@ -541,6 +751,10 @@
           if (this.mode === 'play' && t > me.invulnUntil && touches(b, me)) this.onLocalHit(b, t);
         } else if (!b.ghost) {
           for (const o of this.others()) {
+            if (o.isBot) { // את הרובוט בודקים כאן, כי הוא "חי" במחשב הזה
+              if (this.mode === 'play' && t > o.invulnUntil && touches(b, o)) { this.botHit(o, b, t); break; }
+              continue;
+            }
             if (t > o.invulnUntil && touches(b, o)) {
               b.ghost = true; // נראה שפגע – מחכים לאישור מהמחשב של מי שנפגע
               b.sprite.setAlpha(0.35); b.trail.stop();
@@ -658,8 +872,10 @@
         this.pus.forEach(p => { if (!p.taken && t > p.expire) { this.send('pux', { id: p.id }); this.removePu(p.id, false); this.nextPu = t + 6000; } });
       }
       if (this.mode !== 'play') return;
+      const bot = this.botId && this.players[this.botId];
       this.pus.forEach(p => {
         if (p.taken || p.claimed) return;
+        if (bot && dist(bot.x, bot.y, p.x, p.y) < 38) { this.grantPu(p.id, bot.id); return; }
         if (dist(this.me.x, this.me.y, p.x, p.y) < 38) {
           if (this.isHost) this.grantPu(p.id, this.meId);
           else { p.claimed = true; this.send('puc', { id: p.id }); }
@@ -720,6 +936,9 @@
       const who = this.players[d.by];
       if (!who) return;
       this.floatText(who.x, who.y - 100, PU_INFO[type].label, '#' + PU_INFO[type].color.toString(16).padStart(6, '0'));
+      if (who.isBot) {
+        if (type === 'shield') who.shieldUntil = now() + 5000; else who.power = { type, n: 3 };
+      }
       if (d.by === this.meId) {
         Sfx.pickup();
         if (type === 'shield') { this.me.shieldUntil = now() + 5000; UI.setPower({ type: 'shield', n: 0 }); this.time.delayedCall(5000, () => { if (this.me && !this.me.power) UI.setPower(null); }); }
@@ -780,9 +999,11 @@
     images: {}, scene: null,
     init(onReady) {
       Arena._ready = onReady;
-      const keys = ['p_back', 'p_coat', 'p_face', 'p_hat', 'ice', 'ball', 'pu_big', 'pu_triple', 'pu_shield'];
+      const keys = ['ice', 'ball', 'pu_big', 'pu_triple', 'pu_shield'];
       const srcs = keys.map(k => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(SVG_ASSETS[k]));
       keys.push('arena'); srcs.push(window.ARENA_IMG);
+      keys.push('machine'); srcs.push(window.MACHINE_IMG);
+      Object.keys(window.DOLL_IMGS).forEach(n => { keys.push('doll_' + n); srcs.push(window.DOLL_IMGS[n]); });
       Promise.all(keys.map((k, i) => new Promise((res, rej) => {
         const img = new Image();
         img.onload = () => { Arena.images[k] = img; res(); };

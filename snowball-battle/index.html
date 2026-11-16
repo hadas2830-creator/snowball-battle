@@ -28,12 +28,9 @@
         <input id="name" maxlength="12" autocomplete="nickname" placeholder="למשל: שלגיה">
       </label>
 
-      <div class="field">
-        <span>צבע הכובע שלך</span>
-        <div id="colors" class="colors"></div>
-      </div>
 
       <button id="btn-create" class="btn primary big">יצירת חדר חדש</button>
+      <button id="btn-bot" class="btn big bot-btn">🤖 אימון נגד המחשב</button>
 
       <div class="divider"><span>או הצטרפות לחדר פתוח</span></div>
 
@@ -41,29 +38,63 @@
         <li class="rooms-empty">מחפשים חדרים פתוחים…</li>
       </ul>
 
-      <p class="code-label">יש לך קוד של חדר?</p>
-      <div class="join-row">
-        <input id="code" inputmode="numeric" maxlength="4" placeholder="קוד חדר" dir="ltr" aria-label="קוד חדר בן 4 ספרות">
-        <button id="btn-join" class="btn">הצטרפות</button>
-      </div>
-      <p id="join-hint" class="hint-line"></p>
       <p id="home-msg" class="msg" role="alert"></p>
       <p id="touch-note" class="hint-line" hidden>💻 המשחק עובד הכי טוב במחשב עם מקלדת ועכבר</p>
 
-      <details class="howto">
-        <summary>איך משחקים?</summary>
-        <ul>
-          <li><b>חצים</b> או <b>W A S D</b> – לזוז</li>
-          <li><b>רווח</b> – לזרוק (אפשר להחזיק). הכדור עף לכיוון שהולכים – החץ הקטן מראה לאן</li>
-          <li>מתחבאים מאחורי עצים, אנשי שלג והבקתה</li>
-          <li>על האגם הקפוא מחליקים – זהירות!</li>
-          <li>אוספים בונוסים: <span class="b-big">כדור ענק</span>, <span class="b-triple">זריקה משולשת</span>, <span class="b-shield">מגן קרח</span></li>
-          <li>כל אחד לעצמו – הראשון שפוגע 5 פעמים מנצח 🏆</li>
-          <li>אפשר לשחק 2 או 3 – מי שפתח את החדר לוחץ "התחלת משחק"</li>
-        </ul>
-      </details>
+      <button id="btn-rules" class="btn rules-btn" type="button">📖 הוראות המשחק</button>
     </div>
   </section>
+
+  <!-- חלון הוראות -->
+  <template id="rules-tpl">
+    <div class="card rules-card">
+      <h2>📖 איך משחקים?</h2>
+      <div class="rules">
+        <h3>🎯 המטרה</h3>
+        <p>לפגוע בשאר השחקנים בכדורי שלג. כל אחד לעצמו – <b>הראשון שפוגע 5 פעמים מנצח</b> 🏆</p>
+
+        <h3>⌨️ שליטה</h3>
+        <ul>
+          <li><b>חצים</b> או <b>W A S D</b> – לזוז</li>
+          <li><b>רווח</b> – לזרוק (אפשר להחזיק). הכדור עף לכיוון שהולכים – החץ הלבן הקטן מראה לאן</li>
+        </ul>
+
+        <h3>⛄ כדורים ומכונה</h3>
+        <ul>
+          <li>כל אחד מתחיל עם <b>10 כדורים</b>. המונה בפינה למטה מראה כמה נשארו</li>
+          <li>כשנשארים <b>3 כדורים או פחות</b> – הולכים ל<b>מכונת הכדורים</b> ועומדים לידה עד שמתמלא ל-10</li>
+          <li>עם יותר מ-3 כדורים <b>המכונה כבויה ואפורה</b>. כשהיא נדלקת וחוזרת לצבע כחול – אפשר להטעין!</li>
+          <li>בזמן הטעינה את חשופה – זהירות 😉</li>
+        </ul>
+
+        <h3>🌲 הזירה</h3>
+        <ul>
+          <li>מתחבאים מאחורי עצים, אנשי שלג, הבקתה והחומות – הכדורים נעצרים בהם</li>
+          <li>על האגמים הקפואים <b>מחליקים</b> – קשה לעצור!</li>
+          <li>מי שנפגע <b>קופא</b> לרגע בתוך גוש קרח</li>
+        </ul>
+
+        <h3>🎁 בונוסים (מופיעים מדי פעם)</h3>
+        <ul>
+          <li><span class="b-big">כדור ענק</span> – 3 כדורים גדולים שקשה להתחמק מהם</li>
+          <li><span class="b-triple">זריקה משולשת</span> – 3 זריקות של שלושה כדורים בבת אחת</li>
+          <li><span class="b-shield">מגן קרח</span> – 5 שניות שאף כדור לא פוגע בך</li>
+        </ul>
+
+        <h3>👥 משחק עם חברים</h3>
+        <ul>
+          <li>אחד לוחץ <b>"יצירת חדר חדש"</b>, והחדר מופיע אצל כולם ברשימת <b>החדרים הפתוחים</b></li>
+          <li>שאר השחקנים לוחצים <b>"הצטרפות"</b> ליד החדר</li>
+          <li>2 או 3 שחקנים. מי שפתח את החדר לוחץ <b>"התחלת משחק"</b></li>
+          <li>כל שחקן מקבל בובה אקראית</li>
+        </ul>
+
+        <h3>🤖 אימון נגד המחשב</h3>
+        <p>משחק לבד נגד "רובוט השלג" – הוא מתחמק ומכוון טוב! טיפ: לזרוק לאן שהוא הולך, ולהתקרב אליו.</p>
+      </div>
+      <div class="btns"><button class="btn primary" id="btn-rules-close" type="button">הבנתי, בואו נשחק!</button></div>
+    </div>
+  </template>
 
   <!-- מסך המתנה -->
   <section id="waiting" class="screen">
@@ -85,6 +116,7 @@
     <div id="countdown" aria-live="polite"></div>
     <div id="power"><span class="picon"></span><span class="ptext"></span></div>
     <div id="hint">חצים / WASD לזוז · רווח לזרוק</div>
+    <div id="ammo" aria-live="polite"><span class="aballs"></span><span class="atext"></span></div>
   </section>
 
   <div id="overlay" class="overlay" role="dialog" aria-modal="true"></div>
@@ -96,6 +128,7 @@
   <script src="config.js"></script>
   <script src="assets.js"></script>
   <script src="arena-img.js"></script>
+  <script src="dolls-img.js"></script>
   <script src="audio.js"></script>
   <script src="net.js"></script>
   <script src="game.js"></script>
