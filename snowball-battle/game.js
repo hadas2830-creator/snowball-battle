@@ -1002,8 +1002,10 @@
       const keys = ['ice', 'ball', 'pu_big', 'pu_triple', 'pu_shield'];
       const srcs = keys.map(k => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(SVG_ASSETS[k]));
       keys.push('arena'); srcs.push(window.ARENA_IMG);
-      keys.push('machine'); srcs.push(window.MACHINE_IMG);
-      Object.keys(window.DOLL_IMGS).forEach(n => { keys.push('doll_' + n); srcs.push(window.DOLL_IMGS[n]); });
+      // הבובות והמכונה שמורות בלי הקידומת – מוסיפים אותה כאן
+      const png = (b) => (b.startsWith('data:') ? b : 'data:image/png;base64,' + b);
+      keys.push('machine'); srcs.push(png(window.MACHINE_IMG));
+      Object.keys(window.DOLL_IMGS).forEach(n => { keys.push('doll_' + n); srcs.push(png(window.DOLL_IMGS[n])); });
       Promise.all(keys.map((k, i) => new Promise((res, rej) => {
         const img = new Image();
         img.onload = () => { Arena.images[k] = img; res(); };
