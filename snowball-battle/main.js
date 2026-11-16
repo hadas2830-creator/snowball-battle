@@ -128,7 +128,50 @@
   const cfg = window.SUPABASE_CONFIG;
   const configured = cfg && cfg.url && cfg.url.indexOf('YOUR-') === -1 && window.supabase;
   if (!configured) $('home-msg').textContent = 'חסר חיבור ל-Supabase (קובץ config.js). צריך להשלים אותו לפני שמשחקים.';
-  else Net.init(cfg);
+  else { Net.init(cfg); Net.watchLobby(renderRooms); }
+
+  /* ---------- רשימת החדרים הפתוחים בדף הפתיחה ---------- */
+  function renderRooms(rooms) {
+    const ul = $('rooms');
+    ul.innerHTML = '';
+    const list = rooms.filter(r => r.code !== S.code).sort((a, b) => (a.t || 0) - (b.t || 0));
+    if (!list.length) {
+      ul.appendChild(el('li', 'rooms-empty', 'אין כרגע חדרים פתוחים – אפשר ליצור אחד! ⛄'));
+      return;
+    }
+    list.forEach(r => {
+      const n = Math.max(1, Math.min(MAX_PLAYERS, +r.n || 1));
+      const full = n >= MAX_PLAYERS;
+      const li = el('li');
+      li.style.setProperty('--c', COLORS.includes(r.color) ? r.color : COLORS[1]);
+      const info = el('span', 'rinfo');
+      info.append(el('span', 'rhost', 'החדר של ' + cleanName(r.host)));
+      const meta = el('span', 'rmeta' + (r.playing ? ' busy' : ''),
+        n + '/' + MAX_PLAYERS + ' שחקנים · קוד ' + r.code + (r.playing ? ' · באמצע משחק' : ''));
+      info.append(meta);
+      const btn = el('button', 'btn' + (full ? '' : ' primary'), full ? 'מלא' : 'הצטרפות');
+      btn.type = 'button';
+      btn.disabled = full;
+      btn.onclick = () => {
+        Sfx.unlock(); Sfx.click();
+        if (!readName()) return;
+        enterRoom(r.code, 'guest');
+      };
+      li.append(el('span', 'dot'), info, btn);
+      ul.appendChild(li);
+    });
+  }
+
+  // מי שפתח את החדר מודיע עליו ברשימה של כולם
+  function announceRoom() {
+    if (!configured) return;
+    if (S.code && S.isHost) {
+      Net.announce({
+        code: S.code, host: cleanName(S.me.name), color: S.me.color,
+        n: Math.max(1, S.players.length), playing: !!S.inMatch, t: S.joinedAt
+      });
+    } else Net.unannounce();
+  }
 
   $('btn-create').onclick = () => {
     Sfx.unlock(); Sfx.click();
@@ -197,6 +240,7 @@
       if (stillHere.length < 2) endMatchAlone();
     }
     renderLobby();
+    announceRoom();
   }
 
   function renderLobby() {
@@ -217,7 +261,7 @@
     start.textContent = n < 2 ? 'צריך לפחות 2 שחקנים' : 'התחלת משחק (' + n + ' שחקנים)';
     let sub;
     if (S.matchBusy && !S.inMatch) sub = 'יש משחק באמצע – תיכנסו בסיבוב הבא 🙂';
-    else if (S.isHost) sub = n < 2 ? 'תגידו לחברים את הקוד (אפשר עד 3 שחקנים)' : 'כשכולם בפנים – לוחצים "התחלת משחק"';
+    else if (S.isHost) sub = n < 2 ? 'החדר מופיע עכשיו אצל כולם בדף הפתיחה – החברים פשוט לוחצים "הצטרפות" (עד 3 שחקנים)' : 'כשכולם בפנים – לוחצים "התחלת משחק"';
     else sub = n < 2 ? 'ממתינים לשחקנים נוספים…' : 'ממתינים להתחלת המשחק…';
     $('wait-sub').textContent = sub;
   }
@@ -253,6 +297,7 @@
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     show('game');
     Arena.startRound();
+    announceRoom();
   }
 
   function buildHud(roster) {
@@ -273,6 +318,7 @@
   function endMatchAlone() {
     S.inMatch = false; S.matchBusy = false; S.roster = null;
     Arena.stop();
+    announceRoom();
     overlay(`
       <div class="card">
         <div class="trophy">🔌</div>
@@ -299,6 +345,7 @@
   }
 
   function leaveRoom() {
+    Net.unannounce();
     Net.leave(); Arena.stop(); overlay(null);
     Object.assign(S, { players: [], roster: null, inMatch: false, matchBusy: false, code: null, isHost: false });
     show('home');

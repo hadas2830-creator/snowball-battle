@@ -106,6 +106,20 @@ input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 4px rg
 
 .divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 14px; margin: 22px 0 12px; }
 .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: #c9d8ec; }
+/* חדרים פתוחים */
+.rooms { list-style: none; padding: 0; margin: 0 0 6px; display: grid; gap: 8px; max-height: 210px; overflow-y: auto; }
+.rooms li {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px;
+  background: #fff; border: 2px solid #dbe6f3; animation: rise .35s ease;
+}
+.rooms .dot { width: 18px; height: 18px; border-radius: 50%; background: var(--c); flex: none; box-shadow: 0 0 0 3px rgba(0,0,0,.06); }
+.rooms .rinfo { flex: 1; min-width: 0; }
+.rooms .rhost { font-weight: 700; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rooms .rmeta { font-size: 13px; color: var(--muted); }
+.rooms .rmeta.busy { color: #c55f00; }
+.rooms .btn { padding: 8px 14px; font-size: 15px; flex: none; }
+.rooms li.rooms-empty { justify-content: center; color: var(--muted); font-size: 15px; border-style: dashed; background: transparent; }
+.code-label { margin: 14px 0 6px; font-size: 14px; color: var(--muted); font-weight: 500; }
 .join-row { display: flex; gap: 10px; }
 .join-row input { flex: 1; min-width: 0; }
 

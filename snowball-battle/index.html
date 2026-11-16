@@ -35,8 +35,13 @@
 
       <button id="btn-create" class="btn primary big">יצירת חדר חדש</button>
 
-      <div class="divider"><span>או הצטרפות לחדר קיים</span></div>
+      <div class="divider"><span>או הצטרפות לחדר פתוח</span></div>
 
+      <ul id="rooms" class="rooms" aria-live="polite">
+        <li class="rooms-empty">מחפשים חדרים פתוחים…</li>
+      </ul>
+
+      <p class="code-label">יש לך קוד של חדר?</p>
       <div class="join-row">
         <input id="code" inputmode="numeric" maxlength="4" placeholder="קוד חדר" dir="ltr" aria-label="קוד חדר בן 4 ספרות">
         <button id="btn-join" class="btn">הצטרפות</button>
