@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>קרב כדורי שלג</title>
+<meta name="description" content="משחק כדורי שלג מהיר לשני שחקנים, כל אחד מהמחשב שלו">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9D%84%EF%B8%8F%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="stage" aria-hidden="true"></div>
+
+  <!-- מסך פתיחה -->
+  <section id="home" class="screen active">
+    <div class="card home-card">
+      <div class="logo">
+        <span class="flake">❄</span>
+        <h1>קרב כדורי שלג</h1>
+        <p class="tag">2–3 שחקנים · כל אחד מהמחשב שלו · הרבה שלג</p>
+      </div>
+
+      <label class="field">
+        <span>איך קוראים לך?</span>
+        <input id="name" maxlength="12" autocomplete="nickname" placeholder="למשל: שלגיה">
+      </label>
+
+      <div class="field">
+        <span>צבע הכובע שלך</span>
+        <div id="colors" class="colors"></div>
+      </div>
+
+      <button id="btn-create" class="btn primary big">יצירת חדר חדש</button>
+
+      <div class="divider"><span>או הצטרפות לחדר פתוח</span></div>
+
+      <ul id="rooms" class="rooms" aria-live="polite">
+        <li class="rooms-empty">מחפשים חדרים פתוחים…</li>
+      </ul>
+
+      <p class="code-label">יש לך קוד של חדר?</p>
+      <div class="join-row">
+        <input id="code" inputmode="numeric" maxlength="4" placeholder="קוד חדר" dir="ltr" aria-label="קוד חדר בן 4 ספרות">
+        <button id="btn-join" class="btn">הצטרפות</button>
+      </div>
+      <p id="join-hint" class="hint-line"></p>
+      <p id="home-msg" class="msg" role="alert"></p>
+      <p id="touch-note" class="hint-line" hidden>💻 המשחק עובד הכי טוב במחשב עם מקלדת ועכבר</p>
+
+      <details class="howto">
+        <summary>איך משחקים?</summary>
+        <ul>
+          <li><b>חצים</b> או <b>W A S D</b> – לזוז</li>
+          <li><b>רווח</b> – לזרוק (אפשר להחזיק). הכדור עף לכיוון שהולכים – החץ הקטן מראה לאן</li>
+          <li>מתחבאים מאחורי עצים, אנשי שלג והבקתה</li>
+          <li>על האגם הקפוא מחליקים – זהירות!</li>
+          <li>אוספים בונוסים: <span class="b-big">כדור ענק</span>, <span class="b-triple">זריקה משולשת</span>, <span class="b-shield">מגן קרח</span></li>
+          <li>כל אחד לעצמו – הראשון שפוגע 5 פעמים מנצח 🏆</li>
+          <li>אפשר לשחק 2 או 3 – מי שפתח את החדר לוחץ "התחלת משחק"</li>
+        </ul>
+      </details>
+    </div>
+  </section>
+
+  <!-- מסך המתנה -->
+  <section id="waiting" class="screen">
+    <div class="card wait-card">
+      <h2 id="wait-title">החדר שלך מוכן!</h2>
+      <p class="sub">קוד החדר:</p>
+      <div id="room-code" class="room-code" dir="ltr">0000</div>
+      <ul id="plist" class="plist" aria-label="מי בחדר"></ul>
+      <p id="wait-sub" class="sub">תגידו לחברים את הקוד</p>
+      <button id="btn-start" class="btn primary big" hidden>התחלת משחק</button>
+      <button id="btn-copy" class="btn">📋 העתקת קישור לחדר</button>
+      <button id="btn-back" class="btn ghost">חזרה</button>
+    </div>
+  </section>
+
+  <!-- מסך משחק (הזירה עצמה מצוירת ברקע) -->
+  <section id="game" class="screen">
+    <div id="hud"></div>
+    <div id="countdown" aria-live="polite"></div>
+    <div id="power"><span class="picon"></span><span class="ptext"></span></div>
+    <div id="hint">חצים / WASD לזוז · רווח לזרוק</div>
+  </section>
+
+  <div id="overlay" class="overlay" role="dialog" aria-modal="true"></div>
+  <div id="toast" role="status"></div>
+  <button id="mute" class="icon-btn" type="button">🔊</button>
+
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="config.js"></script>
+  <script src="assets.js"></script>
+  <script src="arena-img.js"></script>
+  <script src="audio.js"></script>
+  <script src="net.js"></script>
+  <script src="game.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
