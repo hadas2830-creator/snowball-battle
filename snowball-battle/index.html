@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261117c">
+<link rel="stylesheet" href="style.css?v=20261117n">
 </head>
 <body>
   <div id="stage" aria-hidden="true"></div>
@@ -27,6 +27,11 @@
         <span>איך קוראים לך?</span>
         <input id="name" maxlength="12" autocomplete="nickname" placeholder="למשל: שלגיה">
       </label>
+
+      <div class="field">
+        <span>בחירת זירה</span>
+        <div id="arenas" class="arena-pick"></div>
+      </div>
 
 
       <button id="btn-create" class="btn primary big">יצירת חדר חדש</button>
@@ -57,6 +62,7 @@
         <ul>
           <li><b>חצים</b> או <b>W A S D</b> – לזוז</li>
           <li><b>רווח</b> – לזרוק (אפשר להחזיק). הכדור עף לכיוון שהולכים – החץ הלבן הקטן מראה לאן</li>
+          <li><b>Alt</b> (ליד הרווח) – להתכופף (מחזיקים). מי שמתכופף <b>לא יכול לזוז</b>, אבל יכול לזרוק</li>
         </ul>
 
         <h3>⛄ כדורים ומכונה</h3>
@@ -67,9 +73,13 @@
           <li>בזמן הטעינה את חשופה – זהירות 😉</li>
         </ul>
 
+        <h3>🗺️ שלוש זירות</h3>
+        <p>בדף הפתיחה בוחרים זירה: <b>❄ הקלאסית</b>, <b>⛰️ בהרים</b> (עם נחלים קפואים שמחליקים עליהם) או <b>🏪 רחוב החנויות</b>. בחדר עם חברים – משחקים בזירה שבחר/ה מי שפתח את החדר.</p>
+
         <h3>🌲 הזירה</h3>
         <ul>
-          <li>מתחבאים מאחורי עצים, אנשי שלג, הבקתה והחומות – הכדורים נעצרים בהם</li>
+          <li>מתחבאים מאחורי <b>עצים, אנשי שלג, הבקתה והמכונה</b> – הם גבוהים, והכדורים נעצרים בהם</li>
+          <li><b>חומות השלג והסלעים נמוכים</b>: כדור שעף גבוה עובר מעליהם. מי שעומד מאחורי חומה עלול להיפגע – <b>מי שמתכופף צמוד אליהם מוגן</b>. בשטח פתוח ההתכופפות לא מגינה</li>
           <li>על האגמים הקפואים <b>מחליקים</b> – קשה לעצור!</li>
           <li>מי שנפגע <b>קופא</b> לרגע בתוך גוש קרח</li>
         </ul>
@@ -115,8 +125,9 @@
     <div id="hud"></div>
     <div id="countdown" aria-live="polite"></div>
     <div id="power"><span class="picon"></span><span class="ptext"></span></div>
-    <div id="hint">חצים / WASD לזוז · רווח לזרוק</div>
+    <div id="hint">חצים / WASD לזוז · רווח לזרוק · Alt להתכופף</div>
     <div id="ammo" aria-live="polite"><span class="aballs"></span><span class="atext"></span></div>
+    <div id="coins" aria-label="פתיתי שלג"><span class="cicon">❄</span><span class="ctext">0</span></div>
   </section>
 
   <div id="overlay" class="overlay" role="dialog" aria-modal="true"></div>
@@ -125,13 +136,14 @@
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-  <script src="config.js?v=20261117c"></script>
-  <script src="assets.js?v=20261117c"></script>
-  <script src="arena-img.js?v=20261117c"></script>
-  <script src="dolls-img.js?v=20261117c"></script>
-  <script src="audio.js?v=20261117c"></script>
-  <script src="net.js?v=20261117c"></script>
-  <script src="game.js?v=20261117c"></script>
-  <script src="main.js?v=20261117c"></script>
+  <script src="config.js?v=20261117n"></script>
+  <script src="assets.js?v=20261117n"></script>
+  <script src="arena-img.js?v=20261117n"></script>
+  <script src="arenas-img.js?v=20261117n"></script>
+  <script src="dolls-img.js?v=20261117n"></script>
+  <script src="audio.js?v=20261117n"></script>
+  <script src="net.js?v=20261117n"></script>
+  <script src="game.js?v=20261117n"></script>
+  <script src="main.js?v=20261117n"></script>
 </body>
 </html>

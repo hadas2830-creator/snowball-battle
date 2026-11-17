@@ -298,3 +298,57 @@ body.playing #ammo { display: flex; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* ---------- מטבעות (פתיתי שלג) ---------- */
+#coins {
+  position: absolute; bottom: 66px; right: 16px; display: none; align-items: center; gap: 8px;
+  background: rgba(16, 30, 62, .78); color: #fff; padding: 7px 16px; border-radius: 999px;
+  border: 2px solid #7fd4ff; box-shadow: 0 8px 20px -8px rgba(0,0,0,.5); font-weight: 900; font-size: 18px;
+}
+body.playing.coins-on #coins { display: flex; } /* יופעל כשתהיה חנות בתפריט */
+#coins .cicon { color: #9fe4ff; font-size: 20px; }
+#coins.bump { animation: coinBump .45s cubic-bezier(.2,.9,.3,1.6); }
+@keyframes coinBump { 40% { transform: scale(1.25); } }
+
+/* ---------- החנות בבקתה ---------- */
+.overlay:has(.shop-card) { background: rgba(10, 22, 50, .25); backdrop-filter: none; -webkit-backdrop-filter: none; }
+.shop-card {
+  width: min(620px, 100%); text-align: start !important; color: #fff; border: 3px solid #e7c58f;
+  background: linear-gradient(180deg, rgba(40, 24, 10, .55), rgba(30, 18, 8, .88)), url('cabin-inside.png?v=20261117n') center / cover no-repeat;
+  box-shadow: 0 30px 60px -20px rgba(0,0,0,.7);
+}
+.shop-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+.shop-head h2 { margin: 0; font-size: 28px; text-shadow: 0 3px 10px rgba(0,0,0,.6); }
+.shop-coins { background: rgba(16, 30, 62, .85); border: 2px solid #7fd4ff; border-radius: 999px; padding: 6px 16px; font-size: 20px; white-space: nowrap; }
+.shop-items { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.shop-item {
+  font: inherit; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center;
+  padding: 16px 10px; border-radius: 18px; border: 2px solid #e7c58f; color: #3b2412;
+  background: linear-gradient(180deg, #fff8ec, #f3e2c4); box-shadow: 0 8px 18px -8px rgba(0,0,0,.6); transition: transform .12s;
+}
+.shop-item:hover:not(:disabled) { transform: translateY(-3px); }
+.shop-item:focus-visible { outline: 3px solid #ffbf47; }
+.shop-item.cant { opacity: .55; cursor: default; }
+.shop-item.owned { background: linear-gradient(180deg, #ecfdf3, #c9f2d9); border-color: #34c27a; opacity: 1; }
+.si-icon { font-size: 40px; line-height: 1; }
+.si-name { font-weight: 900; font-size: 18px; }
+.si-desc { font-size: 14px; line-height: 1.4; min-height: 2.8em; }
+.si-price { font-weight: 900; font-size: 18px; background: #1d3461; color: #fff; padding: 4px 14px; border-radius: 999px; }
+.shop-item.owned .si-price { background: #1f9d5c; }
+.shop-exit { display: block; margin: 14px auto 0; color: #ffe9c7; }
+@media (max-width: 560px) { .shop-items { grid-template-columns: 1fr; } }
+
+/* ---------- בחירת זירה ---------- */
+.arena-pick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.arena-opt {
+  font: inherit; cursor: pointer; position: relative; aspect-ratio: 1024 / 538; border-radius: 12px;
+  border: 3px solid #dbe6f3; background: #eef3fa center / cover no-repeat; overflow: hidden; padding: 0;
+  box-shadow: 0 4px 10px -6px rgba(20,40,90,.4); transition: transform .12s;
+}
+.arena-opt:hover { transform: translateY(-2px); }
+.arena-opt.sel { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(47,111,237,.35), 0 6px 14px -6px rgba(20,40,90,.5); }
+.arena-opt:focus-visible { outline: 3px solid #ffbf47; outline-offset: 2px; }
+.ao-name {
+  position: absolute; inset: auto 0 0 0; background: rgba(16,30,62,.72); color: #fff;
+  font-size: 12px; font-weight: 700; padding: 3px 4px; text-align: center; white-space: nowrap;
+}

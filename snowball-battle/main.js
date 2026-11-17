@@ -62,6 +62,38 @@
       e.querySelector('.ptext').textContent = names[p.type] + (p.n ? ' × ' + p.n : '');
       e.dataset.type = p.type; e.classList.add('show');
     },
+    /* ---------- מטבעות וחנות ---------- */
+    setCoins(n, bump) {
+      const c = $('coins'); c.querySelector('.ctext').textContent = n;
+      if (bump) { c.classList.remove('bump'); void c.offsetWidth; c.classList.add('bump'); }
+    },
+    openShop() {
+      const P = Arena.persist, price = Arena.shopPrices;
+      const items = [
+        { id: 'boots', icon: '👢', name: 'מגפי ריצה', desc: 'רצים מהר יותר (‎+15%) – לכל המשחק', owned: P.boots },
+        { id: 'bag', icon: '🎒', name: 'תיק גדול', desc: '15 כדורים במקום 10 – לכל המשחק', owned: P.bag },
+        { id: 'shield', icon: '🛡️', name: 'מגן', desc: '5 שניות שאף כדור לא פוגע בך', owned: false }
+      ];
+      overlay(`
+        <div class="card shop-card">
+          <div class="shop-head"><h2>🏠 החנות של הבקתה</h2><div class="shop-coins">❄ <b>${P.coins}</b></div></div>
+          <div class="shop-items" id="shop-items"></div>
+          <button class="btn ghost shop-exit" id="btn-shop-exit">⬇ יציאה מהבקתה</button>
+        </div>`);
+      const box = $('shop-items');
+      items.forEach(it => {
+        const can = !it.owned && P.coins >= price[it.id].price;
+        const b = el('button', 'shop-item' + (it.owned ? ' owned' : '') + (can ? '' : ' cant'));
+        b.type = 'button'; b.disabled = !can;
+        b.append(el('span', 'si-icon', it.icon), el('span', 'si-name', it.name), el('span', 'si-desc', it.desc),
+          el('span', 'si-price', it.owned ? '✓ יש לך' : '❄ ' + price[it.id].price));
+        b.onclick = () => { if (Arena.buy(it.id)) UI.openShop(); };
+        box.appendChild(b);
+      });
+      $('btn-shop-exit').onclick = () => { Sfx.click(); Arena.closeShop(); };
+    },
+    closeShop() { if (document.querySelector('.shop-card')) overlay(null); },
+
     setAmmo(n, max) {
       const box = $('ammo'), balls = box.querySelector('.aballs');
       if (balls.children.length !== max) { balls.innerHTML = ''; for (let i = 0; i < max; i++) balls.appendChild(el('i')); }
@@ -112,6 +144,32 @@
   const shuffle = (arr) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   S.me.color = COLORS[Math.floor(Math.random() * COLORS.length)];
 
+  /* ---------- בחירת זירה ---------- */
+  const ARENA_INFO = {
+    classic: { name: 'הקלאסית', icon: '❄', thumb: 'arena.png' },
+    mountains: { name: 'בהרים', icon: '⛰️', thumb: 'arena-mountains.jpg' },
+    shops: { name: 'רחוב החנויות', icon: '🏪', thumb: 'arena-shops.jpg' }
+  };
+  const validArena = (k) => (ARENA_INFO[k] ? k : 'classic');
+  S.arena = 'classic';
+  try { S.arena = validArena(localStorage.getItem('sb-arena')); } catch (e) {}
+  const arenasEl = $('arenas');
+  Object.keys(ARENA_INFO).forEach(k => {
+    const a = ARENA_INFO[k], b = el('button', 'arena-opt');
+    b.type = 'button'; b.dataset.k = k;
+    b.style.backgroundImage = 'url(' + a.thumb + '?v=20261117n)';
+    b.append(el('span', 'ao-name', a.icon + ' ' + a.name));
+    b.onclick = () => {
+      S.arena = k; Sfx.unlock(); Sfx.click(); markArena();
+      try { localStorage.setItem('sb-arena', k); } catch (e) {}
+      Arena.setArena(k);
+    };
+    arenasEl.appendChild(b);
+  });
+  function markArena() { [...arenasEl.children].forEach(b => b.classList.toggle('sel', b.dataset.k === S.arena)); }
+  markArena();
+  Arena.arenaKey = S.arena;
+
 
   function readName() {
     const n = nameInput.value.trim().slice(0, 12);
@@ -143,7 +201,7 @@
       const info = el('span', 'rinfo');
       info.append(el('span', 'rhost', 'החדר של ' + cleanName(r.host)));
       const meta = el('span', 'rmeta' + (r.playing ? ' busy' : ''),
-        n + '/' + MAX_PLAYERS + ' שחקנים · קוד ' + r.code + (r.playing ? ' · באמצע משחק' : ''));
+        n + '/' + MAX_PLAYERS + ' שחקנים · ' + (ARENA_INFO[r.arena] ? ARENA_INFO[r.arena].icon + ' ' + ARENA_INFO[r.arena].name : 'קוד ' + r.code) + (r.playing ? ' · באמצע משחק' : ''));
       info.append(meta);
       const btn = el('button', 'btn' + (full ? '' : ' primary'), full ? 'מלא' : 'הצטרפות');
       btn.type = 'button';
@@ -163,7 +221,7 @@
     if (!configured) return;
     if (S.code && S.isHost) {
       Net.announce({
-        code: S.code, host: cleanName(S.me.name), color: S.me.color,
+        code: S.code, host: cleanName(S.me.name), color: S.me.color, arena: S.arena,
         n: Math.max(1, S.players.length), playing: !!S.inMatch, t: S.joinedAt
       });
     } else Net.unannounce();
@@ -259,11 +317,11 @@
     if (!S.isHost || S.players.length < 2) return;
     const colors = shuffle(COLORS); // בובה אקראית לכל שחקן, בלי כפילויות
     const roster = S.players.slice(0, MAX_PLAYERS).map((p, i) => ({ id: p.id, name: cleanName(p.name), color: colors[i] }));
-    Net.send('start', { r: roster });
-    beginMatch(roster);
+    Net.send('start', { r: roster, arena: S.arena });
+    beginMatch(roster, S.arena);
   }
 
-  function beginMatch(roster) {
+  function beginMatch(roster, arena) {
     overlay(null);
     S.roster = roster;
     if (!roster.some(r => r.id === S.me.id)) {
@@ -274,7 +332,7 @@
     S.inMatch = true; S.matchBusy = true;
     Arena.setupMatch({
       roster: roster.map(r => ({ id: r.id, name: r.name, colorNum: parseInt(r.color.slice(1), 16) })),
-      meId: S.me.id, isHost: S.isHost, send: Net.send
+      meId: S.me.id, isHost: S.isHost, send: Net.send, arena: validArena(arena)
     });
     buildHud(roster);
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
@@ -318,7 +376,7 @@
   function onMessage(type, d, from) {
     if (type === 'start') {
       const r = Array.isArray(d.r) ? d.r.slice(0, MAX_PLAYERS).filter(x => x && typeof x.id === 'string' && /^#[0-9a-f]{6}$/i.test(x.color)).map(x => ({ id: x.id, name: cleanName(x.name), color: x.color })) : [];
-      if (r.length >= 2) beginMatch(r);
+      if (r.length >= 2) beginMatch(r, d.arena);
       return;
     }
     if (type === 'rematch') { if (S.isHost) startMatch(); return; }
@@ -329,6 +387,7 @@
   function leaveRoom() {
     Net.unannounce();
     Net.leave(); Arena.stop(); overlay(null);
+    Arena.resetShop(); // מטבעות וציוד מתאפסים כשיוצאים מהחדר
     Object.assign(S, { players: [], roster: null, inMatch: false, matchBusy: false, code: null, isHost: false, botMode: false });
     show('home');
   }
@@ -346,7 +405,7 @@
     overlay(null);
     Arena.setupMatch({
       roster: roster.map(r => ({ id: r.id, name: r.name, colorNum: parseInt(r.color.slice(1), 16) })),
-      meId: S.me.id, isHost: true, send: () => {}, bot: BOT_ID
+      meId: S.me.id, isHost: true, send: () => {}, bot: BOT_ID, arena: S.arena
     });
     buildHud(roster);
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
@@ -358,10 +417,15 @@
     Sfx.unlock(); Sfx.click();
     if (!readName()) return;
     $('home-msg').textContent = '';
+    Arena.resetShop();
     startBotMatch();
   };
 
   $('btn-start').onclick = () => { Sfx.click(); startMatch(); };
+
+  // יציאה מהחנות במקש Esc, וטעינה מוקדמת של תמונת הבקתה
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.querySelector('.shop-card')) Arena.closeShop(); });
+  new Image().src = 'cabin-inside.png?v=20261117n';
 
   // חלון הוראות המשחק
   $('btn-rules').onclick = () => {

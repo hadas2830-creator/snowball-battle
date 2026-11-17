@@ -73,6 +73,17 @@ pu_triple: `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" vie
 <circle cx="30" cy="20" r="6.5" fill="#fff"/><circle cx="20" cy="36" r="6.5" fill="#fff"/><circle cx="40" cy="36" r="6.5" fill="#fff"/>
 </svg>`,
 
+/* פתית שלג – המטבע של החנות */
+pu_coin: `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 60 60">
+<defs><radialGradient id="o" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#e9fbff"/><stop offset=".5" stop-color="#7fd4ff"/><stop offset="1" stop-color="#2b8fd6"/></radialGradient></defs>
+<circle cx="30" cy="30" r="26" fill="url(#o)" stroke="#ffffff" stroke-width="3"/>
+<g stroke="#ffffff" stroke-width="3.2" stroke-linecap="round">
+<path d="M30 13v34M15.3 21.5l29.4 17M15.3 38.5l29.4-17"/>
+<path d="M30 13l-4 4M30 13l4 4M30 47l-4-4M30 47l4-4M15.3 21.5l5.4 0.6M15.3 21.5l1.7 5.1M44.7 38.5l-5.4-0.6M44.7 38.5l-1.7-5.1M15.3 38.5l1.7-5.1M15.3 38.5l5.4-0.6M44.7 21.5l-1.7 5.1M44.7 21.5l-5.4 0.6"/>
+</g>
+<circle cx="30" cy="30" r="3.5" fill="#ffffff"/>
+</svg>`,
+
 pu_shield: `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 60 60">
 <defs><radialGradient id="o" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#b8f3ff"/><stop offset=".45" stop-color="#06b6d4"/><stop offset="1" stop-color="#0e7490"/></radialGradient></defs>
 <circle cx="30" cy="30" r="26" fill="url(#o)" stroke="#ffffff" stroke-width="3"/>

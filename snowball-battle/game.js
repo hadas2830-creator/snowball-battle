@@ -4,11 +4,15 @@
      כל המיקומים למטה כתובים בפיקסלים של התמונה המקורית, ו-S מגדיל אותם. */
   const S = 1.25;
   const W = 1280, H = 672;
-  const B = { x1: 30 * S, x2: 998 * S, y1: 60 * S, y2: 518 * S };
+  let B; // גבולות הזירה – נקבעים לפי הזירה שנבחרה
   const SPEED = 270, BALL_SPEED = 780, BALL_RANGE = 820, COOLDOWN = 420, WIN_SCORE = 5;
   const PLAYER_R = 15, PS = 0.34;
   // הבובות: תמונה בגובה 150 פיקסלים, מוצגת בגובה ~75
-  const DOLL_SCALE = 0.5;
+  const DOLL_SCALE = 0.5, DOLL_H = 75; // גובה הבובה על המסך
+  // התכופפות (Alt): מגינה רק מאחורי חומת שלג – כדור שעף מעל החומה עובר מעל הראש של מי שמתכופף צמוד אליה.
+  // חומות שלג נמוכות: כדור נמוך נעצר בהן, כדור גבוה עובר מעליהן
+  const LOW_WALL_H = 29, CROUCH_SPEED = 0, WALL_COVER = 130; // מתכופפים = עומדים במקום
+  const low = (r) => Object.assign(r, { low: true });
   const DOLL_BY_COLOR = { 0xef4444: 'doll_red', 0x3b82f6: 'doll_blue', 0x22c55e: 'doll_green' };
   // גודל הגוף לצורך פגיעה: חצי רוחב המעיל (בלי הידיים), ועומק קטן על הקרקע
   const BODY_RX = 16, BODY_RY = 9;
@@ -26,10 +30,20 @@
     return false;
   }
   // נקודות התחלה לשחקן 1, 2, 3
-  const SPAWNS = [{ x: 150 * S, y: 345 * S }, { x: 880 * S, y: 300 * S }, { x: 690 * S, y: 200 * S }];
+  let SPAWNS;
   // תחמושת: 10 כדורים, ומכונה באמצע שממלאת כדור כל 0.15 שנייה כשעומדים לידה
-  const MAX_AMMO = 10, RELOAD_EVERY = 150, RELOAD_FROM = 3; // אפשר להטעין כשנשארו 3 כדורים או פחות
-  const MACHINE = { x: 505 * S, y: 420 * S }; // מתחת לבקתה, עם מעבר ביניהם
+  // חנות בבקתה: עומדים מול הדלת ולוחצים חץ למעלה
+  const DOOR = { x: 503 * S, y: 362 * S, rx: 24 * S, ry: 15 * S };
+  const COIN_PER_HIT = 2, COIN_PICKUP = 2;
+  // אין כניסה לבקתה; החנות תעבור לתפריט. עד אז – בלי פתיתים בזירה ובלי מונה
+  const DOOR_SHOP = false, COINS_ON = false;
+  const SHOP = {
+    boots: { price: 6 },   // מגפי ריצה: מהירות +15% (נשאר)
+    bag: { price: 5 },     // תיק גדול: 15 כדורים (נשאר)
+    shield: { price: 4 }   // מגן: 5 שניות (חד פעמי)
+  };
+  const MAX_AMMO = 10, BIG_BAG = 15, RELOAD_EVERY = 150, RELOAD_FROM = 3; // אפשר להטעין כשנשארו 3 כדורים או פחות
+  let MACHINE; // מתחת לבקתה, עם מעבר ביניהם
   // אזור הטעינה (אליפסה סביב המכונה) – קטן מספיק כדי לא לגלוש לאגם
   const ZONE = { rx: 60, ry: 32, dy: -8 };
   // כמה פעמים בשנייה שולחים מיקום, וכמה "החלקה" מוסיפים (במילישניות):
@@ -38,57 +52,116 @@
   // רמת הרובוט (רמה גבוהה): זמן תגובה, דיוק, מרחק שהוא שומר, והפסקה נוספת בין זריקות
   const BOT = { react: 0.23, aimError: 0.09, dodgeMargin: 9, keepDist: 300, extraCooldown: 330, speed: 0.8 };
 
-  /* מכשולים – לפי המקומות שלהם בציור */
-  const circle = (x, y, r) => ({ c: true, x: x * S, y: y * S, r: r * S });
-  const rect = (x1, y1, x2, y2) => ({ c: false, x1: x1 * S, y1: y1 * S, x2: x2 * S, y2: y2 * S });
-  const SHAPES = [
-    // עצים (הגזע)
-    circle(125, 140, 12), circle(280, 137, 12), circle(660, 95, 12), circle(912, 122, 12),
-    circle(855, 188, 12), circle(65, 268, 15), circle(945, 385, 15), circle(100, 500, 15),
-    // אנשי שלג
-    circle(328, 245, 17), circle(330, 388, 22), circle(677, 357, 17),
-    // חומות שלג
-    rect(180, 153, 292, 190), rect(713, 407, 826, 442), rect(836, 435, 960, 473),
-    // בקתה
-    rect(432, 282, 578, 348),
-    // סלעים
-    rect(188, 372, 250, 402), rect(758, 203, 822, 237),
-    // מכונת הכדורים
-    rect(482, 406, 528, 421)
-  ];
-  const PONDS = [{ x: 502 * S, y: 135 * S, rx: 100 * S, ry: 35 * S }, { x: 503 * S, y: 483 * S, rx: 127 * S, ry: 40 * S }];
-  const CHIMNEY = { x: 541 * S, y: 218 * S };
-
+  let SHAPES, PONDS, STREAMS, CHIMNEY, CUTS, CUT_TOP, CUT_BG;
   /* גזירות מהציור – כדי שאפשר יהיה להתחבא מאחורי חפצים.
      [x1, y1, x2, base, core]: הריבוע של החפץ (base = קו הרגליים שלו),
      core = החלק שבטוח שייך לחפץ ולא נמחק לעולם (tri = עץ, circ = עיגולים, box = ריבוע) */
-  const FENCE_Y = 52;
   const tri = (cx, top, w, base) => ({ t: 'tri', cx, top, w, base });
   const circ = (...c) => ({ t: 'circ', c });
   const box = (x1, y1, x2, y2) => ({ t: 'box', x1, y1, x2, y2 });
-  const CUTS = [
-    // עצים
-    [83, 38, 167, 144, tri(125, 42, 54, 136)],
-    [240, 36, 320, 141, tri(280, 40, 52, 134)],
-    [619, 10, 700, 100, tri(660, 14, 52, 92)],
-    [870, 22, 953, 127, tri(912, 26, 54, 119)],
-    [812, 80, 900, 194, tri(855, 92, 58, 186)],
-    [8, 108, 128, 274, tri(66, 124, 82, 262)],
-    [877, 164, 1014, 392, tri(946, 180, 96, 380)],
-    [18, 276, 188, 510, tri(102, 292, 120, 496)],
-    // אנשי שלג
-    [294, 174, 362, 262, circ([328, 192, 9], [328, 216, 12], [328, 242, 16])],
-    [271, 280, 389, 412, circ([330, 306, 14], [330, 345, 18], [331, 385, 22])],
-    [644, 286, 710, 378, circ([677, 302, 9], [677, 327, 12], [677, 356, 16])],
-    // בקתה
-    [420, 206, 585, 352, { t: 'multi', parts: [box(436, 282, 570, 346), tri(503, 212, 150, 282), box(530, 214, 552, 250)] }],
-    // חומות וסלעים
-    [175, 147, 297, 195, box(184, 158, 288, 190)],
-    [708, 400, 831, 447, box(717, 412, 822, 442)],
-    [830, 427, 965, 479, box(840, 440, 956, 474)],
-    [182, 365, 255, 406, box(192, 377, 246, 401)],
-    [752, 195, 825, 242, box(762, 206, 818, 237)]
-  ];
+  const cabinCore = (cx, top, roofBase, x1, x2, bottom) => ({ t: 'multi', parts: [box(x1, roofBase, x2, bottom), tri(cx, top, x2 - x1 + 16, roofBase)] });
+
+  /* ---------- הזירות ----------
+     כל המיקומים בפיקסלים של תמונה ברוחב 1024 (הגובה 538).
+     shapes: ['c', x, y, r] = עיגול (עץ, איש שלג, פנס) | ['r', x1, y1, x2, y2, נמוך?] = מלבן. נמוך (1) = חומה/סלע/ספסל: כדור גבוה עובר מעליו
+     cuts: [x1, y1, x2, תחתית, ליבה] = מה גוזרים מהציור כדי שאפשר יהיה להתחבא מאחוריו */
+  const ARENAS = {
+    classic: {
+      img: 'arena', bg: 'white', cutTop: 52, bounds: [30, 60, 998, 518],
+      machine: [690, 226], chimney: [541, 218], spawns: [[150, 345], [880, 300], [505, 405]],
+      shapes: [
+        ['c', 125, 140, 12], ['c', 280, 137, 12], ['c', 660, 95, 12], ['c', 912, 122, 12], ['c', 855, 188, 12],
+        ['c', 65, 268, 15], ['c', 945, 385, 15], ['c', 100, 500, 15],
+        ['c', 328, 245, 17], ['c', 330, 388, 22], ['c', 677, 357, 17],
+        ['r', 180, 153, 292, 190, 1], ['r', 713, 407, 826, 442, 1], ['r', 836, 435, 960, 473, 1],
+        ['r', 432, 282, 578, 348],
+        ['r', 188, 372, 250, 402, 1], ['r', 758, 203, 822, 237, 1]
+      ],
+      ponds: [[502, 135, 100, 35], [503, 483, 127, 40]],
+      cuts: [
+        [83, 38, 167, 144, tri(125, 42, 54, 136)], [240, 36, 320, 141, tri(280, 40, 52, 134)],
+        [619, 10, 700, 100, tri(660, 14, 52, 92)], [870, 22, 953, 127, tri(912, 26, 54, 119)],
+        [812, 80, 900, 194, tri(855, 92, 58, 186)], [8, 108, 128, 274, tri(66, 124, 82, 262)],
+        [877, 164, 1014, 392, tri(946, 180, 96, 380)], [18, 276, 188, 510, tri(102, 292, 120, 496)],
+        [294, 174, 362, 262, circ([328, 192, 9], [328, 216, 12], [328, 242, 16])],
+        [271, 280, 389, 412, circ([330, 306, 14], [330, 345, 18], [331, 385, 22])],
+        [644, 286, 710, 378, circ([677, 302, 9], [677, 327, 12], [677, 356, 16])],
+        [420, 206, 585, 352, { t: 'multi', parts: [box(436, 282, 570, 346), tri(503, 212, 150, 282), box(530, 214, 552, 250)] }],
+        [175, 147, 297, 195, box(184, 158, 288, 190)], [708, 400, 831, 447, box(717, 412, 822, 442)],
+        [830, 427, 965, 479, box(840, 440, 956, 474)], [182, 365, 255, 406, box(192, 377, 246, 401)],
+        [752, 195, 825, 242, box(762, 206, 818, 237)]
+      ]
+    },
+    mountains: {
+      img: 'arena_mountains', bg: 'blue', cutTop: 100, bounds: [30, 100, 998, 518],
+      machine: [529, 152], chimney: [541, 222], spawns: [[150, 345], [880, 300], [505, 405]],
+      shapes: [
+        ['c', 122, 140, 12], ['c', 280, 137, 12], ['c', 660, 95, 12], ['c', 912, 122, 12], ['c', 855, 190, 12],
+        ['c', 65, 270, 15], ['c', 945, 385, 15], ['c', 100, 505, 15], ['c', 300, 520, 13], ['c', 722, 520, 13],
+        ['r', 757, 203, 823, 237, 1], ['r', 186, 370, 250, 402, 1],
+        ['r', 836, 433, 962, 474, 1],
+        ['r', 432, 282, 575, 348]
+      ],
+      ponds: [[502, 484, 127, 40]],
+      streams: [
+        { r: 15, pts: [[232, 162], [352, 240], [242, 300], [368, 398]] },
+        { r: 15, pts: [[742, 137], [668, 215], [790, 305], [658, 402]] }
+      ],
+      cuts: [
+        [86, 38, 162, 146, tri(122, 42, 56, 138)], [240, 36, 320, 143, tri(280, 40, 56, 135)],
+        [620, 8, 700, 101, tri(660, 12, 56, 93)], [874, 22, 952, 128, tri(912, 26, 56, 120)],
+        [814, 84, 900, 196, tri(855, 88, 60, 188)], [10, 110, 126, 276, tri(65, 116, 86, 266)],
+        [876, 164, 1012, 392, tri(945, 170, 100, 382)], [18, 278, 190, 512, tri(100, 284, 124, 500)],
+        [255, 414, 348, 527, tri(300, 420, 64, 516)], [680, 414, 768, 527, tri(722, 420, 62, 516)],
+        [752, 196, 828, 242, box(762, 206, 818, 236)], [182, 364, 256, 406, box(192, 374, 246, 400)],
+        [830, 426, 966, 480, box(840, 438, 956, 474)],
+        [420, 205, 585, 352, { t: 'multi', parts: [box(436, 282, 570, 346), tri(503, 212, 150, 282), box(530, 214, 552, 250)] }]
+      ]
+    },
+    shops: {
+      img: 'arena_shops', bg: 'white', cutTop: 120, bounds: [30, 125, 998, 518],
+      machine: [505, 420], chimney: null, spawns: [[150, 330], [880, 300], [512, 165]],
+      shapes: [
+        ['c', 65, 270, 15], ['c', 100, 505, 15], ['c', 945, 385, 15],
+        ['c', 212, 208, 7], ['c', 810, 205, 7],
+        ['c', 328, 245, 17], ['c', 330, 392, 22], ['c', 677, 360, 17],
+        ['r', 438, 290, 575, 348],
+        ['r', 620, 210, 706, 238, 1], ['r', 758, 203, 822, 237, 1],
+        ['r', 188, 368, 250, 401, 1], ['r', 698, 295, 756, 331, 1],
+        ['r', 713, 406, 826, 442, 1], ['r', 836, 433, 962, 474, 1]
+      ],
+      ponds: [[503, 486, 127, 40]],
+      cuts: [
+        [10, 110, 126, 276, tri(65, 116, 86, 266)], [18, 278, 190, 512, tri(100, 284, 124, 500)],
+        [876, 164, 1012, 392, tri(945, 170, 100, 382)],
+        [196, 106, 230, 215, box(206, 114, 219, 212)], [794, 104, 828, 212, box(803, 112, 817, 210)],
+        [294, 174, 362, 264, circ([328, 192, 9], [328, 216, 12], [328, 243, 16])],
+        [271, 280, 389, 414, circ([330, 306, 14], [330, 345, 18], [331, 388, 22])],
+        [644, 286, 710, 380, circ([677, 305, 9], [677, 330, 12], [677, 359, 16])],
+        [425, 190, 598, 352, { t: 'multi', parts: [box(440, 262, 574, 346), tri(511, 196, 160, 258)] }],
+        [615, 203, 712, 242, box(624, 212, 702, 236)], [752, 196, 828, 242, box(762, 206, 818, 236)],
+        [182, 362, 256, 406, box(192, 372, 246, 400)], [692, 290, 762, 335, box(702, 298, 752, 330)],
+        [708, 400, 831, 447, box(717, 412, 822, 442)], [830, 427, 966, 480, box(840, 440, 956, 474)]
+      ]
+    }
+  };
+
+  // מפעיל זירה: מכשולים, קרח, מכונה, נקודות התחלה וגבולות
+  function setArena(key) {
+    const d = ARENAS[key] || ARENAS.classic;
+    B = { x1: d.bounds[0] * S, y1: d.bounds[1] * S, x2: d.bounds[2] * S, y2: d.bounds[3] * S };
+    MACHINE = { x: d.machine[0] * S, y: d.machine[1] * S };
+    SPAWNS = d.spawns.map(([x, y]) => ({ x: x * S, y: y * S }));
+    SHAPES = d.shapes.map(q => q[0] === 'c' ? circle(q[1], q[2], q[3]) : (q[5] ? low(rect(q[1], q[2], q[3], q[4])) : rect(q[1], q[2], q[3], q[4])));
+    SHAPES.push(rect(d.machine[0] - 23, d.machine[1] - 14, d.machine[0] + 23, d.machine[1] + 1)); // המכונה
+    PONDS = d.ponds.map(([x, y, rx, ry]) => ({ x: x * S, y: y * S, rx: rx * S, ry: ry * S }));
+    STREAMS = (d.streams || []).map(st => ({ r: st.r * S, pts: st.pts.map(([x, y]) => [x * S, y * S]) }));
+    CHIMNEY = d.chimney ? { x: d.chimney[0] * S, y: d.chimney[1] * S } : null;
+    CUTS = d.cuts; CUT_TOP = d.cutTop; CUT_BG = d.bg;
+  }
+  const circle = (x, y, r) => ({ c: true, x: x * S, y: y * S, r: r * S });
+  const rect = (x1, y1, x2, y2) => ({ c: false, x1: x1 * S, y1: y1 * S, x2: x2 * S, y2: y2 * S });
+  setArena('classic');
 
   function inCore(core, x, y) {
     if (core.t === 'multi') return core.parts.some(p => inCore(p, x, y));
@@ -100,22 +173,27 @@
   }
 
   /* גוזר כל חפץ מהציור: מוחק את השלג שמסביב (מילוי מהקצוות), משאיר את החפץ */
-  function buildCutouts(scene, img) {
+  function buildCutouts(scene, img, arenaKey) {
+    const made = [], k = img.naturalWidth / 1024;
     const cv = document.createElement('canvas');
     cv.width = img.naturalWidth; cv.height = img.naturalHeight;
     const ctx = cv.getContext('2d', { willReadFrequently: true });
     ctx.drawImage(img, 0, 0);
     CUTS.forEach(([x1, y1, x2, base, core], n) => {
-      const w = x2 - x1, h = base - y1;
-      const id = ctx.getImageData(x1, y1, w, h), d = id.data;
+      const key = 'cut_' + arenaKey + '_' + n;
+      if (scene.textures.exists(key)) { made.push(scene.add.image(x1 * S, y1 * S, key).setOrigin(0).setScale(S / k).setDepth(base * S)); return; }
+      const X1 = Math.round(x1 * k), Y1 = Math.round(y1 * k);
+      const w = Math.round((x2 - x1) * k), h = Math.round((base - y1) * k);
+      const id = ctx.getImageData(X1, Y1, w, h), d = id.data;
       const isBg = (i) => {
-        if (y1 + Math.floor(i / w) < FENCE_Y) return true; // הגדר שמאחורי העצים
+        if (y1 + Math.floor(i / w) / k < CUT_TOP) return true; // הגדר / ההרים / החנויות שמאחורי החפץ
         const r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2];
         const mn = Math.min(r, g, b), mx = Math.max(r, g, b);
+        if (CUT_BG === 'blue') return mn >= 150 && b >= r && b >= g - 6 && b - r <= 85; // שלג כחלחל (ערב בהרים)
         return mn >= 196 && mx - mn <= 42;
       };
       const coreMask = new Uint8Array(w * h);
-      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (inCore(core, x + x1, y + y1)) coreMask[y * w + x] = 1;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (inCore(core, x / k + x1, y / k + y1)) coreMask[y * w + x] = 1;
       const clear = new Uint8Array(w * h);
       const stack = [];
       const seed = (i) => { if (!clear[i] && !coreMask[i] && isBg(i)) { clear[i] = 1; stack.push(i); } };
@@ -134,22 +212,29 @@
         // קצה רך
         if ((x > 0 && clear[i - 1]) || (x < w - 1 && clear[i + 1]) || (i >= w && clear[i - w]) || (i < w * (h - 1) && clear[i + w])) d[i * 4 + 3] = 150;
       }
-      const key = 'cut' + n;
       const t = scene.textures.createCanvas(key, w, h);
       t.getContext().putImageData(id, 0, 0); t.refresh();
-      scene.add.image(x1 * S, y1 * S, key).setOrigin(0).setScale(S).setDepth(base * S);
+      made.push(scene.add.image(x1 * S, y1 * S, key).setOrigin(0).setScale(S / k).setDepth(base * S));
     });
+    return made;
   }
 
   const PU_INFO = {
     big: { label: 'כדור ענק!', color: 0x4361ee },
     triple: { label: 'זריקה משולשת!', color: 0xf77f00 },
-    shield: { label: 'מגן קרח!', color: 0x06b6d4 }
+    shield: { label: 'מגן קרח!', color: 0x06b6d4 },
+    coin: { label: '+2 ❄', color: 0x7fd4ff }
   };
 
   const now = () => performance.now();
   const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
-  const inPond = (x, y) => PONDS.some(p => ((x - p.x) / p.rx) ** 2 + ((y - p.y) / p.ry) ** 2 < 1);
+  const segDist = (x, y, a, b) => {
+    const dx = b[0] - a[0], dy = b[1] - a[1], l = dx * dx + dy * dy || 1;
+    const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / l));
+    return Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy);
+  };
+  const inPond = (x, y) => PONDS.some(p => ((x - p.x) / p.rx) ** 2 + ((y - p.y) / p.ry) ** 2 < 1)
+    || STREAMS.some(st => st.pts.some((p, i) => i > 0 && segDist(x, y, st.pts[i - 1], p) < st.r));
   function darker(hex, f) {
     const r = ((hex >> 16) & 255) * f, g = ((hex >> 8) & 255) * f, b = (hex & 255) * f;
     return (r << 16) | (g << 8) | b;
@@ -185,8 +270,12 @@
     if (p.y < B.y1) { p.y = B.y1; p.vy = Math.max(0, p.vy); }
     if (p.y > B.y2) { p.y = B.y2; p.vy = Math.min(0, p.vy); }
   }
-  function ballBlocked(x, y, r) {
+  function overLowWall(x, y) {
+    return SHAPES.some(s => s.low && x > s.x1 - 6 && x < s.x2 + 6 && y > s.y1 - 6 && y < s.y2 + 4);
+  }
+  function ballBlocked(x, y, r, h) {
     for (const s of SHAPES) {
+      if (s.low && h > LOW_WALL_H) continue; // הכדור עף מעל חומת השלג הנמוכה
       if (s.c) { if (dist(x, y, s.x, s.y) < s.r + r * 0.4) return true; }
       else if (x > s.x1 - r * 0.4 && x < s.x2 + r * 0.4 && y > s.y1 - r * 0.4 && y < s.y2 + r * 0.2) return true;
     }
@@ -263,32 +352,7 @@
       Object.keys(Arena.images).forEach(k => this.textures.addImage(k, Arena.images[k]));
       buildTextures(this);
 
-      this.add.image(0, 0, 'arena').setOrigin(0).setDisplaySize(W, H).setDepth(-100);
-      try { buildCutouts(this, Arena.images.arena); } catch (e) { console.warn('cutouts failed', e); }
-
-      // מכונת הכדורים: אזור טעינה זוהר על הקרקע + המכונה + חץ שמופיע כשנגמרים הכדורים
-      const zone = this.machineZone = this.add.ellipse(MACHINE.x, MACHINE.y + ZONE.dy, ZONE.rx * 2, ZONE.ry * 2, 0x7fd4ff, 0.22)
-        .setStrokeStyle(2.5, 0xffffff, 0.8).setDepth(-55).setVisible(false);
-      this.tweens.add({ targets: zone, alpha: 0.55, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-      this.add.image(MACHINE.x, MACHINE.y + 3, 'shadow').setScale(1.5, 0.9).setDepth(-50);
-      this.machineImg = this.add.image(MACHINE.x, MACHINE.y + 2, 'machine').setOrigin(0.5, 0.98).setScale(0.5).setDepth(MACHINE.y);
-      this.add.particles(MACHINE.x, MACHINE.y - 80, 'flake', {
-        x: { min: -18, max: 18 }, speedY: { min: -30, max: -10 }, lifespan: 1200, scale: { start: 0.5, end: 0 }, alpha: { start: 0.9, end: 0 }, frequency: 220
-      }).setDepth(MACHINE.y + 1);
-      this.machineArrow = this.add.text(MACHINE.x, MACHINE.y - 118, '⬇ כדורים כאן', {
-        fontFamily: 'Rubik, Arial, sans-serif', fontSize: '20px', fontStyle: '900', color: '#ffe066', stroke: '#1b2a4a', strokeThickness: 6, rtl: true
-      }).setOrigin(0.5).setDepth(9200).setVisible(false);
-      this.tweens.add({ targets: this.machineArrow, y: MACHINE.y - 106, duration: 420, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-      // מנעול מעל המכונה כשאי אפשר להטעין
-      this.machineLock = this.add.text(MACHINE.x, MACHINE.y - 112, '🔒', { fontSize: '34px', padding: { y: 6 } })
-        .setOrigin(0.5).setDepth(9200).setVisible(false);
-      this.tweens.add({ targets: this.machineLock, y: MACHINE.y - 104, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-
-      // עשן מהארובה
-      this.add.particles(CHIMNEY.x, CHIMNEY.y, 'smoke', {
-        lifespan: 3200, speedY: { min: -38, max: -22 }, speedX: { min: 4, max: 16 },
-        scale: { start: 0.5, end: 1.8 }, alpha: { start: 0.75, end: 0 }, frequency: 260
-      }).setDepth(2000);
+      this.buildArena(Arena.arenaKey || 'classic');
 
       // שלג יורד
       this.add.particles(0, -20, 'flake', {
@@ -304,10 +368,47 @@
 
       this.players = {}; this.balls = new Map(); this.pus = new Map(); this.prints = [];
       this.mode = 'idle'; this.slow = 1;
-      this.keys = this.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE', false);
+      this.keys = this.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE,ALT', false);
 
       Arena.scene = this;
       Arena._ready && Arena._ready();
+    }
+
+    /* ---------- בניית הזירה (אפשר להחליף זירה בין משחקים) ---------- */
+    buildArena(key) {
+      if (!ARENAS[key]) key = 'classic';
+      if (this.arenaKey === key && this.arenaObjs) return;
+      (this.arenaObjs || []).forEach(o => { this.tweens.killTweensOf(o); o.destroy(); });
+      this.arenaObjs = []; this.arenaKey = key;
+      setArena(key);
+      const A = (o) => { this.arenaObjs.push(o); return o; };
+      const def = ARENAS[key];
+      A(this.add.image(0, 0, def.img).setOrigin(0).setDisplaySize(W, H).setDepth(-100));
+      try { buildCutouts(this, Arena.images[def.img], key).forEach(A); } catch (e) { console.warn('cutouts failed', e); }
+
+      // מכונת הכדורים
+      const zone = this.machineZone = A(this.add.ellipse(MACHINE.x, MACHINE.y + ZONE.dy, ZONE.rx * 2, ZONE.ry * 2, 0x7fd4ff, 0.22)
+        .setStrokeStyle(2.5, 0xffffff, 0.8).setDepth(-55).setVisible(false));
+      this.tweens.add({ targets: zone, alpha: 0.55, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      A(this.add.image(MACHINE.x, MACHINE.y + 3, 'shadow').setScale(1.5, 0.9).setDepth(-50));
+      this.machineImg = A(this.add.image(MACHINE.x, MACHINE.y + 2, 'machine').setOrigin(0.5, 0.98).setScale(0.5).setDepth(MACHINE.y));
+      A(this.add.particles(MACHINE.x, MACHINE.y - 80, 'flake', {
+        x: { min: -18, max: 18 }, speedY: { min: -30, max: -10 }, lifespan: 1200, scale: { start: 0.5, end: 0 }, alpha: { start: 0.9, end: 0 }, frequency: 220
+      }).setDepth(MACHINE.y + 1));
+      this.machineArrow = A(this.add.text(MACHINE.x, MACHINE.y - 118, '⬇ כדורים כאן', {
+        fontFamily: 'Rubik, Arial, sans-serif', fontSize: '20px', fontStyle: '900', color: '#ffe066', stroke: '#1b2a4a', strokeThickness: 6, rtl: true
+      }).setOrigin(0.5).setDepth(9200).setVisible(false));
+      this.doorArrow = A(this.add.text(DOOR.x, DOOR.y - 92, '⬆', {
+        fontFamily: 'Rubik, Arial, sans-serif', fontSize: '30px', fontStyle: '900', color: '#ffe066', stroke: '#1b2a4a', strokeThickness: 6
+      }).setOrigin(0.5).setDepth(9200).setVisible(false));
+      this.machineLock = A(this.add.text(MACHINE.x, MACHINE.y - 112, '🔒', { fontSize: '34px', padding: { y: 6 } }).setOrigin(0.5).setDepth(9200).setVisible(false));
+      this.machineLocked = undefined;
+
+      // עשן מהארובה (אם יש)
+      if (CHIMNEY) A(this.add.particles(CHIMNEY.x, CHIMNEY.y, 'smoke', {
+        lifespan: 3200, speedY: { min: -38, max: -22 }, speedX: { min: 4, max: 16 },
+        scale: { start: 0.5, end: 1.8 }, alpha: { start: 0.75, end: 0 }, frequency: 260
+      }).setDepth(2000));
     }
 
     /* ---------- שחקנים ---------- */
@@ -318,7 +419,8 @@
       const shadow = this.add.image(0, 3, 'shadow').setScale(0.95, 0.75);
       const body = this.add.container(0, 0);
       // הבובה לפי הצבע שנבחר (אדום / כחול / ירוק)
-      const face = this.add.image(0, 2, DOLL_BY_COLOR[color] || 'doll_red').setOrigin(0.5, 1).setScale(DOLL_SCALE);
+      const dollName = (DOLL_BY_COLOR[color] || 'doll_red').replace('doll_', '');
+      const face = this.add.image(0, 2, 'doll_' + dollName).setOrigin(0.5, 1).setScale(DOLL_SCALE);
       const ice = this.add.image(0, 2, 'ice').setOrigin(0.5, 1).setScale(PS * 1.1).setVisible(false).setAlpha(0.85);
       body.add([face, ice]);
       const bubble = this.add.image(0, -33, 'bubble').setScale(0.72).setVisible(false);
@@ -327,13 +429,14 @@
         stroke: '#1b2a4a', strokeThickness: 5, rtl: true
       }).setOrigin(0.5);
       c.add([ring, shadow, body, bubble, label]);
+      c.nameLabel = label;
       if (isMe) {
         const arrow = this.add.triangle(0, -68, 0, 0, 14, 0, 7, 9, color).setStrokeStyle(2, 0xffffff);
         c.add(arrow);
         this.tweens.add({ targets: arrow, y: -63, duration: 500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
       }
       return {
-        id: info.id, name: info.name, color, isMe, c, body, ice, bubble, face,
+        id: info.id, name: info.name, color, isMe, c, body, ice, bubble, face, dollName, view: 'front',
         x: 0, y: 0, vx: 0, vy: 0, aim: 0, facing: 1, walkT: 0, punch: 0, moving: false,
         stunUntil: 0, invulnUntil: 0, shieldUntil: 0, power: null, nextThrow: 0,
         snaps: [], lastPrint: null, printSide: 1, shieldRemote: false
@@ -347,6 +450,7 @@
       this.pus.forEach(p => p.c.destroy()); this.pus.clear();
       this.prints.forEach(p => p.destroy()); this.prints = [];
       this.mode = 'idle'; this.aimArrow.setVisible(false); this.input.keyboard.clearCaptures();
+      if (this.doorArrow) this.doorArrow.setVisible(false);
       if (this.machineZone) { this.machineArrow.setVisible(false); this.machineLock.setVisible(false); this.machineImg.clearTint().setAlpha(1); this.machineLocked = false; }
       this.slow = 1; this.tweens.timeScale = 1;
       if (this.confetti) { this.confetti.destroy(); this.confetti = null; }
@@ -355,6 +459,8 @@
     /* o = { roster: [{id, name, colorNum}], meId, isHost, send } */
     setupMatch(o) {
       this.clearAll();
+      Arena.arenaKey = o.arena || Arena.arenaKey || 'classic';
+      this.buildArena(Arena.arenaKey);
       this.isHost = o.isHost; this.send = o.send;
       this.meId = o.meId;
       this.roster = o.roster.map(r => r.id);
@@ -362,11 +468,13 @@
       this.sendEvery = net.send; this.renderDelay = net.delay;
       o.roster.forEach(r => { this.players[r.id] = this.makePlayer(r, r.id === this.meId); });
       this.me = this.players[this.meId];
+      this.me.speedMul = Arena.persist.boots ? 1.15 : 1;
+      this.me.maxAmmo = Arena.persist.bag ? BIG_BAG : MAX_AMMO;
       // מצב אימון: שחקן שהמחשב משחק בו
       this.botId = o.bot || null;
       if (this.botId && this.players[this.botId]) this.players[this.botId].isBot = true;
       // בזמן משחק: חצים ורווח שייכים למשחק (לא מגללים ולא לוחצים על כפתורים)
-      this.input.keyboard.addCapture('SPACE,UP,DOWN,LEFT,RIGHT');
+      this.input.keyboard.addCapture('SPACE,UP,DOWN,LEFT,RIGHT,ALT');
       this.scores = {};
       this.roster.forEach(id => { this.scores[id] = 0; });
       this.placeAtSpawn();
@@ -378,7 +486,7 @@
       this.roster.forEach((id, i) => {
         const p = this.players[id]; if (!p) return;
         const s = SPAWNS[i % SPAWNS.length];
-        Object.assign(p, { x: s.x, y: s.y, vx: 0, vy: 0, snaps: [], stunUntil: 0, invulnUntil: 0, shieldUntil: 0, shieldRemote: false, power: null, lastPrint: null, nextThrow: 0, strafeUntil: 0, unstickUntil: 0, stuckSince: 0, ammo: MAX_AMMO, nextReload: 0 });
+        Object.assign(p, { x: s.x, y: s.y, vx: 0, vy: 0, snaps: [], stunUntil: 0, invulnUntil: 0, shieldUntil: 0, shieldRemote: false, power: null, lastPrint: null, nextThrow: 0, strafeUntil: 0, unstickUntil: 0, stuckSince: 0, ammo: p.maxAmmo || MAX_AMMO, nextReload: 0, inShop: false });
         p.aim = s.x < W / 2 ? 0 : Math.PI;
         p.ice.setVisible(false); p.bubble.setVisible(false); p.c.setPosition(p.x, p.y);
       });
@@ -402,7 +510,7 @@
       if (this.confetti) { this.confetti.destroy(); this.confetti = null; }
       this.slow = 1; this.tweens.timeScale = 1;
       this.roster.forEach(id => { this.scores[id] = 0; });
-      this.pushScores(); UI.setPower(null); UI.setAmmo(MAX_AMMO, MAX_AMMO);
+      this.pushScores(); UI.setPower(null); UI.setAmmo(this.me.ammo, this.me.maxAmmo); UI.setCoins(Arena.persist.coins); this.nextCoin = now() + 9000;
       this.placeAtSpawn();
       this.mode = 'countdown';
       this.ballSeq = 0; this.puSeq = 0; this.nextPu = 0;
@@ -434,11 +542,12 @@
       let ix = (k.D.isDown || k.RIGHT.isDown ? 1 : 0) - (k.A.isDown || k.LEFT.isDown ? 1 : 0);
       let iy = (k.S.isDown || k.DOWN.isDown ? 1 : 0) - (k.W.isDown || k.UP.isDown ? 1 : 0);
       const len = Math.hypot(ix, iy) || 1; ix /= len; iy /= len;
-      const canMove = this.mode === 'play' && t > p.stunUntil;
+      const canMove = this.mode === 'play' && t > p.stunUntil && !p.inShop;
       const ice = inPond(p.x, p.y);
       const accel = ice ? 2.4 : 15;
       const f = 1 - Math.exp(-accel * dt);
-      const sp = canMove ? SPEED * (ice ? 1.15 : 1) : 0;
+      p.crouch = this.mode === 'play' && k.ALT.isDown;
+      const sp = canMove ? SPEED * (p.speedMul || 1) * (ice ? 1.15 : 1) * (p.crouch ? CROUCH_SPEED : 1) : 0;
       p.vx += (ix * sp - p.vx) * f; p.vy += (iy * sp - p.vy) * f;
       p.x += p.vx * dt; p.y += p.vy * dt;
       resolve(p);
@@ -458,11 +567,20 @@
         .setPosition(p.x + Math.cos(p.aim) * 38, p.y - 12 + Math.sin(p.aim) * 22)
         .setRotation(p.aim).setDepth(p.y + 1);
 
-      if (k.SPACE.isDown && this.mode === 'play' && t > p.stunUntil && t >= p.nextThrow) this.throwBall(t);
+      if (k.SPACE.isDown && this.mode === 'play' && !p.inShop && t > p.stunUntil && t >= p.nextThrow) this.throwBall(t);
+
+      // דלת הבקתה: עומדים מולה ולוחצים חץ למעלה כדי להיכנס לחנות; חץ למטה – יציאה
+      const ddx = (p.x - DOOR.x) / DOOR.rx, ddy = (p.y - DOOR.y) / DOOR.ry;
+      const atDoor = DOOR_SHOP && this.mode === 'play' && ddx * ddx + ddy * ddy <= 1;
+      this.doorArrow.setVisible(atDoor && !p.inShop);
+      const JD = Phaser.Input.Keyboard.JustDown;
+      const upNow = JD(k.UP) || JD(k.W), downNow = JD(k.DOWN) || JD(k.S);
+      if (atDoor && !p.inShop && upNow && t > p.stunUntil) this.openShop();
+      else if (p.inShop && (downNow || this.mode !== 'play')) this.closeShop();
 
       if (t - (this.lastSend || 0) > this.sendEvery && (this.mode === 'play' || this.mode === 'countdown')) {
         this.lastSend = t;
-        this.send('st', { x: Math.round(p.x), y: Math.round(p.y), a: Math.round(p.aim * 100) / 100, m: p.moving ? 1 : 0, sh: t < p.shieldUntil ? 1 : 0 });
+        this.send('st', { x: Math.round(p.x), y: Math.round(p.y), a: Math.round(p.aim * 100) / 100, m: p.moving ? 1 : 0, sh: t < p.shieldUntil ? 1 : 0, cr: p.crouch ? 1 : 0 });
       }
     }
 
@@ -481,11 +599,21 @@
       p.aim = a.a + da * k;
       p.moving = (b.m || a.m) && (Math.abs(p.x - px) + Math.abs(p.y - py) > 0.3);
       p.shieldRemote = !!b.sh;
+      p.crouch = !!b.cr;
     }
 
     animate(p, dt, t) {
       p.c.setPosition(p.x, p.y).setDepth(p.y);
       const face = Math.cos(p.aim) >= 0 ? 1 : -1;
+      const sn = Math.sin(p.aim);
+      const view = sn < -0.55 ? 'back' : sn > 0.55 ? 'front' : 'side';
+      if (view !== p.view) {
+        const key = view === 'front' ? 'doll_' + p.dollName : 'doll' + view + '_' + p.dollName;
+        if (this.textures.exists(key)) {
+          p.view = view;
+          p.face.setTexture(key).setScale(DOLL_H / this.textures.get(key).getSourceImage().height);
+        }
+      }
       p.facing = face;
       if (p.moving) {
         p.walkT += dt * 15;
@@ -497,8 +625,12 @@
       }
       p.punch = Math.max(0, p.punch - dt * 5);
       const breathe = 1 + Math.sin(t / 320) * 0.015;
-      p.body.scaleX = face * (1 + p.punch * 0.16);
-      p.body.scaleY = breathe * (1 - p.punch * 0.1);
+      p.crouchK = (p.crouchK || 0) + ((p.crouch ? 1 : 0) - (p.crouchK || 0)) * Math.min(1, dt * 16);
+      const ck = p.crouchK;
+      p.body.scaleX = face * (1 + p.punch * 0.16) * (1 + ck * 0.1);
+      p.body.scaleY = breathe * (1 - p.punch * 0.1) * (1 - ck * 0.4);
+      if (p.c.nameLabel) p.c.nameLabel.y = -84 + ck * 30;
+      p.bubble.y = -33 + ck * 12;
       p.body.rotation += face * p.punch * 0.28;
       const stunned = t < p.stunUntil;
       p.ice.setVisible(stunned);
@@ -527,6 +659,31 @@
       if (Math.random() < 0.35) this.puff(p.x, p.y, 3, 0.35);
     }
 
+    /* ---------- החנות ---------- */
+    addCoins(n) {
+      Arena.persist.coins += n; UI.setCoins(Arena.persist.coins, true);
+      if (this.me && this.me.inShop) UI.openShop();
+    }
+    openShop() {
+      const p = this.me; p.inShop = true; p.vx = p.vy = 0;
+      Sfx.click(); UI.openShop();
+    }
+    closeShop() {
+      if (!this.me || !this.me.inShop) return;
+      this.me.inShop = false; UI.closeShop();
+    }
+    buy(id) {
+      const item = SHOP[id], P = Arena.persist, p = this.me;
+      if (!item || !p || !p.inShop || P.coins < item.price) return false;
+      if ((id === 'boots' && P.boots) || (id === 'bag' && P.bag)) return false;
+      P.coins -= item.price;
+      if (id === 'boots') { P.boots = true; p.speedMul = 1.15; }
+      if (id === 'bag') { P.bag = true; p.maxAmmo = BIG_BAG; UI.setAmmo(p.ammo, p.maxAmmo); }
+      if (id === 'shield') { p.shieldUntil = now() + 5000; UI.setPower({ type: 'shield', n: 0 }); this.time.delayedCall(5000, () => { if (this.me && !this.me.power) UI.setPower(null); }); }
+      Sfx.pickup(); UI.setCoins(P.coins);
+      return true;
+    }
+
     /* ---------- מכונת הכדורים ---------- */
     // המכונה עובדת רק כשנשארו 3 כדורים או פחות, וממלאת עד 10 (אם יוצאים באמצע – נשאר מה שנטען)
     reloadAt(p, t) {
@@ -540,13 +697,14 @@
         }
         p.refilling = true;
       }
-      if (p.ammo >= MAX_AMMO) { p.refilling = false; return; }
+      const full = p.maxAmmo || MAX_AMMO;
+      if (p.ammo >= full) { p.refilling = false; return; }
       if (t < p.nextReload) return;
       p.ammo++; p.nextReload = t + RELOAD_EVERY;
-      if (p.ammo >= MAX_AMMO) p.refilling = false;
+      if (p.ammo >= full) p.refilling = false;
       if (p.isMe) {
-        UI.setAmmo(p.ammo, MAX_AMMO); Sfx.reload(p.ammo);
-        if (p.ammo === MAX_AMMO) { p.zoneWarned = true; this.floatText(p.x, p.y - 100, 'מלא! 10 כדורים', '#9ff0ff'); }
+        UI.setAmmo(p.ammo, full); Sfx.reload(p.ammo);
+        if (p.ammo === full) { p.zoneWarned = true; this.floatText(p.x, p.y - 100, 'מלא!', '#9ff0ff'); }
       }
       this.puff(MACHINE.x, MACHINE.y - 40, 2, 0.4);
     }
@@ -690,10 +848,10 @@
       if (p.ammo <= 0) { // נגמרו הכדורים
         p.nextThrow = t + 600; Sfx.empty();
         this.floatText(p.x, p.y - 100, 'נגמרו הכדורים!', '#ffb4b4');
-        UI.setAmmo(0, MAX_AMMO, true);
+        UI.setAmmo(0, p.maxAmmo, true);
         return;
       }
-      p.ammo--; UI.setAmmo(p.ammo, MAX_AMMO);
+      p.ammo--; UI.setAmmo(p.ammo, p.maxAmmo);
       p.nextThrow = t + COOLDOWN; p.punch = 1;
       let big = false, angles = [p.aim];
       if (p.power) {
@@ -739,23 +897,24 @@
         b.h = 16 + Math.sin(Math.min(pr, 1) * Math.PI) * 30 - Math.max(0, pr - 0.85) * 60;
         b.sprite.setPosition(b.x, b.y - b.h).setDepth(b.y + 30);
         b.sprite.rotation += dt * 9;
+        if (b.h > LOW_WALL_H && overLowWall(b.x, b.y)) b.wallAt = { x: b.x, y: b.y };
         const sh = 1 - (b.h - 16) / 60;
         b.shadow.setPosition(b.x, b.y).setScale(b.r / 22 * sh, b.r / 30 * sh);
 
         if (pr >= 1) { Sfx.splat(); return this.removeBall(b, 'drop'); }
-        if (b.x < B.x1 - 14 || b.x > B.x2 + 14 || b.y < B.y1 - 30 || b.y > B.y2 + 14 || ballBlocked(b.x, b.y, b.r)) { Sfx.splat(); return this.removeBall(b, 'splat'); }
+        if (b.x < B.x1 - 14 || b.x > B.x2 + 14 || b.y < B.y1 - 30 || b.y > B.y2 + 14 || ballBlocked(b.x, b.y, b.r, b.h)) { Sfx.splat(); return this.removeBall(b, 'splat'); }
         if (this.mode !== 'play' && this.mode !== 'over') return;
 
         if (b.owner !== this.meId) {
           const me = this.me;
-          if (this.mode === 'play' && t > me.invulnUntil && touches(b, me)) this.onLocalHit(b, t);
+          if (this.mode === 'play' && t > me.invulnUntil && touches(b, me) && !(me.crouch && b.wallAt && dist(b.wallAt.x, b.wallAt.y, me.x, me.y) < WALL_COVER)) this.onLocalHit(b, t);
         } else if (!b.ghost) {
           for (const o of this.others()) {
             if (o.isBot) { // את הרובוט בודקים כאן, כי הוא "חי" במחשב הזה
               if (this.mode === 'play' && t > o.invulnUntil && touches(b, o)) { this.botHit(o, b, t); break; }
               continue;
             }
-            if (t > o.invulnUntil && touches(b, o)) {
+            if (t > o.invulnUntil && touches(b, o) && !(o.crouch && b.wallAt && dist(b.wallAt.x, b.wallAt.y, o.x, o.y) < WALL_COVER)) {
               b.ghost = true; // נראה שפגע – מחכים לאישור מהמחשב של מי שנפגע
               b.sprite.setAlpha(0.35); b.trail.stop();
               break;
@@ -767,6 +926,7 @@
 
     onLocalHit(b, t) {
       const me = this.me;
+      if (me.inShop) this.closeShop();
       if (t < me.shieldUntil) {
         this.removeBall(b, 'block'); Sfx.block();
         this.flashBubble(me); this.floatText(me.x, me.y - 110, 'נחסם!', '#7fe3ff');
@@ -812,6 +972,7 @@
           this.floatText(sender.x, sender.y - 100, 'פגיעה!', '#ffe066');
           const thrower = this.players[d.by];
           if (thrower) this.floatText(thrower.x, thrower.y - 100, '+1', '#ffe066');
+          if (d.by === this.meId) this.addCoins(COIN_PER_HIT);
           if (this.isHost) this.awardPoint(d.by);
           break;
         }
@@ -868,14 +1029,16 @@
     /* ---------- בונוסים ---------- */
     updatePus(t) {
       if (this.isHost && this.mode === 'play') {
-        if (this.pus.size === 0 && this.nextPu && t > this.nextPu) this.spawnPuHost(t);
-        this.pus.forEach(p => { if (!p.taken && t > p.expire) { this.send('pux', { id: p.id }); this.removePu(p.id, false); this.nextPu = t + 6000; } });
+        const all = [...this.pus.values()], bonuses = all.filter(p => p.type !== 'coin').length, coins = all.length - bonuses;
+        if (bonuses === 0 && this.nextPu && t > this.nextPu) this.spawnPuHost(t);
+        if (COINS_ON && coins < 2 && this.nextCoin && t > this.nextCoin) { this.spawnPuHost(t, 'coin'); this.nextCoin = t + 7000 + Math.random() * 5000; }
+        this.pus.forEach(p => { if (!p.taken && t > p.expire) { this.send('pux', { id: p.id }); this.removePu(p.id, false); if (p.type !== 'coin') this.nextPu = t + 6000; } });
       }
       if (this.mode !== 'play') return;
       const bot = this.botId && this.players[this.botId];
       this.pus.forEach(p => {
         if (p.taken || p.claimed) return;
-        if (bot && dist(bot.x, bot.y, p.x, p.y) < 38) { this.grantPu(p.id, bot.id); return; }
+        if (bot && p.type !== 'coin' && dist(bot.x, bot.y, p.x, p.y) < 38) { this.grantPu(p.id, bot.id); return; }
         if (dist(this.me.x, this.me.y, p.x, p.y) < 38) {
           if (this.isHost) this.grantPu(p.id, this.meId);
           else { p.claimed = true; this.send('puc', { id: p.id }); }
@@ -883,7 +1046,7 @@
       });
     }
 
-    spawnPuHost(t) {
+    spawnPuHost(t, forceType) {
       const types = ['big', 'triple', 'shield'];
       let x = 0, y = 0;
       for (let i = 0; i < 40; i++) {
@@ -891,10 +1054,10 @@
         const p = { x, y, vx: 0, vy: 0 }; resolve(p);
         if (p.x === x && p.y === y && !inPond(x, y) && Object.values(this.players).every(q => dist(x, y, q.x, q.y) > 120)) break;
       }
-      const d = { id: 'u' + (++this.puSeq), type: types[(Math.random() * 3) | 0], x: Math.round(x), y: Math.round(y) };
+      const d = { id: 'u' + (++this.puSeq), type: forceType || types[(Math.random() * 3) | 0], x: Math.round(x), y: Math.round(y) };
       this.send('pu', d);
       this.addPu(d);
-      this.nextPu = Infinity;
+      if (!forceType) this.nextPu = Infinity;
     }
 
     addPu(d) {
@@ -923,7 +1086,7 @@
       const d = { id, by, type: p.type };
       this.send('pug', d);
       this.applyGrant(d);
-      this.nextPu = now() + 7000 + Math.random() * 4000;
+      if (d.type !== 'coin') this.nextPu = now() + 7000 + Math.random() * 4000;
     }
 
     applyGrant(d) {
@@ -936,6 +1099,7 @@
       const who = this.players[d.by];
       if (!who) return;
       this.floatText(who.x, who.y - 100, PU_INFO[type].label, '#' + PU_INFO[type].color.toString(16).padStart(6, '0'));
+      if (type === 'coin') { if (d.by === this.meId) { Sfx.pickup(); this.addCoins(COIN_PICKUP); } return; }
       if (who.isBot) {
         if (type === 'shield') who.shieldUntil = now() + 5000; else who.power = { type, n: 3 };
       }
@@ -999,13 +1163,18 @@
     images: {}, scene: null,
     init(onReady) {
       Arena._ready = onReady;
-      const keys = ['ice', 'ball', 'pu_big', 'pu_triple', 'pu_shield'];
+      const keys = ['ice', 'ball', 'pu_big', 'pu_triple', 'pu_shield', 'pu_coin'];
       const srcs = keys.map(k => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(SVG_ASSETS[k]));
       keys.push('arena'); srcs.push(window.ARENA_IMG);
       // הבובות והמכונה שמורות בלי הקידומת – מוסיפים אותה כאן
       const png = (b) => (b.startsWith('data:') ? b : 'data:image/png;base64,' + b);
       keys.push('machine'); srcs.push(png(window.MACHINE_IMG));
+      Object.keys(window.ARENA_IMGS || {}).forEach(n => { keys.push('arena_' + n); srcs.push('data:image/jpeg;base64,' + window.ARENA_IMGS[n]); });
       Object.keys(window.DOLL_IMGS).forEach(n => { keys.push('doll_' + n); srcs.push(png(window.DOLL_IMGS[n])); });
+      Object.keys(window.DOLL_VIEWS || {}).forEach(n => {
+        keys.push('dollback_' + n); srcs.push(png(window.DOLL_VIEWS[n].back));
+        keys.push('dollside_' + n); srcs.push(png(window.DOLL_VIEWS[n].side));
+      });
       Promise.all(keys.map((k, i) => new Promise((res, rej) => {
         const img = new Image();
         img.onload = () => { Arena.images[k] = img; res(); };
@@ -1023,6 +1192,15 @@
     startRound() { Arena.scene.startRound(); },
     onMessage(type, d, from) { Arena.scene && Arena.scene.onMessage(type, d, from); },
     setHost(v) { Arena.scene && Arena.scene.setHost(v); },
+    arenaKey: 'classic',
+    arenaList: ['classic', 'mountains', 'shops'],
+    setArena(key) { Arena.arenaKey = key; if (Arena.scene && Arena.scene.mode === 'idle') Arena.scene.buildArena(key); },
+    // מה שנקנה בחנות נשמר בין סיבובים (עד שיוצאים מהחדר)
+    persist: { coins: 0, boots: false, bag: false },
+    resetShop() { Arena.persist = { coins: 0, boots: false, bag: false }; },
+    shopPrices: SHOP,
+    buy(id) { return Arena.scene ? Arena.scene.buy(id) : false; },
+    closeShop() { Arena.scene && Arena.scene.closeShop(); },
     removePlayer(id) { Arena.scene && Arena.scene.removePlayer(id); },
     stop() { Arena.scene && Arena.scene.stop(); }
   };
