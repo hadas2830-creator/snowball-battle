@@ -161,7 +161,9 @@
   Object.keys(ARENA_INFO).forEach(k => {
     const a = ARENA_INFO[k], b = el('button', 'arena-opt');
     b.type = 'button'; b.dataset.k = k;
-    b.style.backgroundImage = 'url(' + a.thumb + '?v=20261117r)';
+    // התמונה הקטנה: לזירות החדשות לוקחים מתוך arenas-img.js (בלי קובץ תמונה נפרד)
+    const img = window.ARENA_IMGS && window.ARENA_IMGS[k];
+    b.style.backgroundImage = img ? 'url(data:image/jpeg;base64,' + img + ')' : 'url(' + a.thumb + ')';
     b.append(el('span', 'ao-lock'), el('span', 'ao-name', a.icon + ' ' + a.name));
     b.onclick = () => {
       Sfx.unlock(); Sfx.click();
