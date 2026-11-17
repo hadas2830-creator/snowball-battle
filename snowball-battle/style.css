@@ -314,7 +314,7 @@ body.playing.coins-on #coins { display: flex; } /* יופעל כשתהיה חנ�
 .overlay:has(.shop-card) { background: rgba(10, 22, 50, .25); backdrop-filter: none; -webkit-backdrop-filter: none; }
 .shop-card {
   width: min(620px, 100%); text-align: start !important; color: #fff; border: 3px solid #e7c58f;
-  background: linear-gradient(180deg, rgba(40, 24, 10, .55), rgba(30, 18, 8, .88)), url('cabin-inside.png?v=20261117n') center / cover no-repeat;
+  background: linear-gradient(180deg, rgba(40, 24, 10, .55), rgba(30, 18, 8, .88)), url('cabin-inside.png?v=20261117r') center / cover no-repeat;
   box-shadow: 0 30px 60px -20px rgba(0,0,0,.7);
 }
 .shop-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
@@ -352,3 +352,20 @@ body.playing.coins-on #coins { display: flex; } /* יופעל כשתהיה חנ�
   position: absolute; inset: auto 0 0 0; background: rgba(16,30,62,.72); color: #fff;
   font-size: 12px; font-weight: 700; padding: 3px 4px; text-align: center; white-space: nowrap;
 }
+
+/* ---------- חשבון ונקודות ---------- */
+.account { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center;
+  background: rgba(232, 242, 252, .85); border: 2px solid #dbe6f3; border-radius: 16px; padding: 8px 12px; margin-bottom: 4px; }
+.account.in { background: linear-gradient(180deg, #fff8e1, #ffeeba); border-color: #f5c242; }
+.acc-hint { flex: 1 1 100%; text-align: center; font-size: 14px; color: var(--muted); }
+.acc-who { font-weight: 900; }
+.acc-pts { font-weight: 900; color: #b45309; background: #fff; border-radius: 999px; padding: 3px 12px; }
+.acc-btn { padding: 6px 14px; font-size: 15px; }
+.account.in .acc-btn { margin-inline-start: auto; }
+.auth-card { width: min(400px, 100%); }
+.auth-card .field { text-align: start; }
+.sub.small { font-size: 13px; margin-top: 12px; }
+input:disabled { background: #f1f5fb; color: var(--navy-2); font-weight: 700; }
+.arena-opt.locked { filter: grayscale(.85) brightness(.85); cursor: not-allowed; }
+.ao-lock { position: absolute; top: 4px; inset-inline: 0; text-align: center; font-size: 12px; font-weight: 900; color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,.8); }

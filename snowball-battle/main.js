@@ -153,20 +153,39 @@
   const validArena = (k) => (ARENA_INFO[k] ? k : 'classic');
   S.arena = 'classic';
   try { S.arena = validArena(localStorage.getItem('sb-arena')); } catch (e) {}
+  // כמה נקודות צריך כדי לפתוח כל זירה (2 נקודות על כל פגיעה)
+  const UNLOCK = { classic: 0, mountains: 0, shops: 0 }; // כל הזירות פתוחות
+  const myPoints = () => (window.Accounts && Accounts.state().loggedIn ? Accounts.state().points : 0);
+  const isOpen = (k) => UNLOCK[k] === 0;
   const arenasEl = $('arenas');
   Object.keys(ARENA_INFO).forEach(k => {
     const a = ARENA_INFO[k], b = el('button', 'arena-opt');
     b.type = 'button'; b.dataset.k = k;
-    b.style.backgroundImage = 'url(' + a.thumb + '?v=20261117n)';
-    b.append(el('span', 'ao-name', a.icon + ' ' + a.name));
+    b.style.backgroundImage = 'url(' + a.thumb + '?v=20261117r)';
+    b.append(el('span', 'ao-lock'), el('span', 'ao-name', a.icon + ' ' + a.name));
     b.onclick = () => {
-      S.arena = k; Sfx.unlock(); Sfx.click(); markArena();
+      Sfx.unlock(); Sfx.click();
+      if (!isOpen(k)) {
+        toast(window.Accounts && Accounts.state().loggedIn
+          ? '🔒 הזירה נפתחת ב-' + UNLOCK[k] + ' נקודות – חסרות לך עוד ' + (UNLOCK[k] - myPoints())
+          : '🔒 כדי לפתוח זירות צריך להיכנס עם שם וסיסמה ולצבור נקודות');
+        return;
+      }
+      S.arena = k; markArena();
       try { localStorage.setItem('sb-arena', k); } catch (e) {}
       Arena.setArena(k);
     };
     arenasEl.appendChild(b);
   });
-  function markArena() { [...arenasEl.children].forEach(b => b.classList.toggle('sel', b.dataset.k === S.arena)); }
+  function markArena() {
+    if (!isOpen(S.arena)) { S.arena = 'classic'; Arena.setArena('classic'); }
+    [...arenasEl.children].forEach(b => {
+      const k = b.dataset.k, open = isOpen(k);
+      b.classList.toggle('sel', k === S.arena);
+      b.classList.toggle('locked', !open);
+      b.querySelector('.ao-lock').textContent = open ? '' : '🔒 ' + (window.Accounts && Accounts.state().loggedIn ? 'עוד ' + (UNLOCK[k] - myPoints()) : UNLOCK[k]) + ' נק׳';
+    });
+  }
   markArena();
   Arena.arenaKey = S.arena;
 
@@ -183,6 +202,8 @@
   const configured = cfg && cfg.url && cfg.url.indexOf('YOUR-') === -1 && window.supabase;
   if (!configured) $('home-msg').textContent = 'חסר חיבור ל-Supabase (קובץ config.js). צריך להשלים אותו לפני שמשחקים.';
   else { Net.init(cfg); Net.watchLobby(renderRooms); }
+
+
 
   /* ---------- רשימת החדרים הפתוחים בדף הפתיחה ---------- */
   function renderRooms(rooms) {
@@ -425,7 +446,7 @@
 
   // יציאה מהחנות במקש Esc, וטעינה מוקדמת של תמונת הבקתה
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.querySelector('.shop-card')) Arena.closeShop(); });
-  new Image().src = 'cabin-inside.png?v=20261117n';
+  new Image().src = 'cabin-inside.png?v=20261117r';
 
   // חלון הוראות המשחק
   $('btn-rules').onclick = () => {

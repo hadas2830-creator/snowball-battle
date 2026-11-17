@@ -81,5 +81,5 @@ window.Net = (function () {
     announced = null;
   }
 
-  return { init, join, send, leave, watchLobby, announce, unannounce };
+  return { init, join, send, leave, watchLobby, announce, unannounce, get client() { return client; } };
 })();

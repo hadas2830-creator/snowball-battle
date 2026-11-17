@@ -9,6 +9,8 @@
   const PLAYER_R = 15, PS = 0.34;
   // הבובות: תמונה בגובה 150 פיקסלים, מוצגת בגובה ~75
   const DOLL_SCALE = 0.5, DOLL_H = 75; // גובה הבובה על המסך
+  // קרח: כמה מהר משנים כיוון (נמוך = מחליק יותר) ומהירות על הקרח
+  const ICE_ACCEL = 0.9, ICE_SPEED = 1.35;
   // התכופפות (Alt): מגינה רק מאחורי חומת שלג – כדור שעף מעל החומה עובר מעל הראש של מי שמתכופף צמוד אליה.
   // חומות שלג נמוכות: כדור נמוך נעצר בהן, כדור גבוה עובר מעליהן
   const LOW_WALL_H = 29, CROUCH_SPEED = 0, WALL_COVER = 130; // מתכופפים = עומדים במקום
@@ -100,7 +102,9 @@
         ['c', 65, 270, 15], ['c', 945, 385, 15], ['c', 100, 505, 15], ['c', 300, 520, 13], ['c', 722, 520, 13],
         ['r', 757, 203, 823, 237, 1], ['r', 186, 370, 250, 402, 1],
         ['r', 836, 433, 962, 474, 1],
-        ['r', 432, 282, 575, 348]
+        ['r', 432, 282, 575, 348],
+        // זאבים (גבוהים – מגינים תמיד)
+        ['r', 302, 396, 372, 420], ['r', 760, 416, 890, 440]
       ],
       ponds: [[502, 484, 127, 40]],
       streams: [
@@ -115,30 +119,39 @@
         [255, 414, 348, 527, tri(300, 420, 64, 516)], [680, 414, 768, 527, tri(722, 420, 62, 516)],
         [752, 196, 828, 242, box(762, 206, 818, 236)], [182, 364, 256, 406, box(192, 374, 246, 400)],
         [830, 426, 966, 480, box(840, 438, 956, 474)],
-        [420, 205, 585, 352, { t: 'multi', parts: [box(436, 282, 570, 346), tri(503, 212, 150, 282), box(530, 214, 552, 250)] }]
+        [420, 205, 585, 352, { t: 'multi', parts: [box(436, 282, 570, 346), tri(503, 212, 150, 282), box(530, 214, 552, 250)] }],
+        // זאבים
+        [290, 310, 384, 424, box(314, 334, 370, 418)],
+        [728, 338, 912, 444, { t: 'multi', parts: [box(745, 352, 880, 410), box(766, 404, 862, 440)] }]
       ]
     },
     shops: {
-      img: 'arena_shops', bg: 'white', cutTop: 120, bounds: [30, 125, 998, 518],
+      img: 'arena_shops', bg: 'white', cutTop: 95, bounds: [30, 95, 998, 518],
       machine: [505, 420], chimney: null, spawns: [[150, 330], [880, 300], [512, 165]],
       shapes: [
+        // ארבעה דוכנים (אפשר להתחבא מאחוריהם) + הקיוסק במרכז
+        ['r', 30, 105, 180, 145], ['r', 258, 150, 398, 190], ['r', 630, 150, 775, 190], ['r', 842, 105, 996, 145],
+        ['r', 438, 290, 575, 348],
         ['c', 65, 270, 15], ['c', 100, 505, 15], ['c', 945, 385, 15],
         ['c', 212, 208, 7], ['c', 810, 205, 7],
         ['c', 328, 245, 17], ['c', 330, 392, 22], ['c', 677, 360, 17],
-        ['r', 438, 290, 575, 348],
         ['r', 620, 210, 706, 238, 1], ['r', 758, 203, 822, 237, 1],
         ['r', 188, 368, 250, 401, 1], ['r', 698, 295, 756, 331, 1],
         ['r', 713, 406, 826, 442, 1], ['r', 836, 433, 962, 474, 1]
       ],
       ponds: [[503, 486, 127, 40]],
       cuts: [
+        [18, 14, 190, 148, { t: 'multi', parts: [tri(103, 16, 168, 50), box(28, 48, 180, 145)] }],
+        [244, 56, 410, 193, { t: 'multi', parts: [tri(326, 60, 162, 96), box(254, 94, 398, 190)] }],
+        [618, 56, 786, 193, { t: 'multi', parts: [tri(702, 60, 166, 96), box(628, 94, 776, 190)] }],
+        [830, 14, 1006, 148, { t: 'multi', parts: [tri(918, 16, 172, 50), box(840, 48, 996, 145)] }],
+        [425, 190, 598, 352, { t: 'multi', parts: [box(440, 262, 574, 346), tri(511, 196, 160, 258)] }],
         [10, 110, 126, 276, tri(65, 116, 86, 266)], [18, 278, 190, 512, tri(100, 284, 124, 500)],
         [876, 164, 1012, 392, tri(945, 170, 100, 382)],
         [196, 106, 230, 215, box(206, 114, 219, 212)], [794, 104, 828, 212, box(803, 112, 817, 210)],
         [294, 174, 362, 264, circ([328, 192, 9], [328, 216, 12], [328, 243, 16])],
         [271, 280, 389, 414, circ([330, 306, 14], [330, 345, 18], [331, 388, 22])],
         [644, 286, 710, 380, circ([677, 305, 9], [677, 330, 12], [677, 359, 16])],
-        [425, 190, 598, 352, { t: 'multi', parts: [box(440, 262, 574, 346), tri(511, 196, 160, 258)] }],
         [615, 203, 712, 242, box(624, 212, 702, 236)], [752, 196, 828, 242, box(762, 206, 818, 236)],
         [182, 362, 256, 406, box(192, 372, 246, 400)], [692, 290, 762, 335, box(702, 298, 752, 330)],
         [708, 400, 831, 447, box(717, 412, 822, 442)], [830, 427, 966, 480, box(840, 440, 956, 474)]
@@ -544,10 +557,10 @@
       const len = Math.hypot(ix, iy) || 1; ix /= len; iy /= len;
       const canMove = this.mode === 'play' && t > p.stunUntil && !p.inShop;
       const ice = inPond(p.x, p.y);
-      const accel = ice ? 2.4 : 15;
+      const accel = ice ? ICE_ACCEL : 15;
       const f = 1 - Math.exp(-accel * dt);
       p.crouch = this.mode === 'play' && k.ALT.isDown;
-      const sp = canMove ? SPEED * (p.speedMul || 1) * (ice ? 1.15 : 1) * (p.crouch ? CROUCH_SPEED : 1) : 0;
+      const sp = canMove ? SPEED * (p.speedMul || 1) * (ice ? ICE_SPEED : 1) * (p.crouch ? CROUCH_SPEED : 1) : 0;
       p.vx += (ix * sp - p.vx) * f; p.vy += (iy * sp - p.vy) * f;
       p.x += p.vx * dt; p.y += p.vy * dt;
       resolve(p);
@@ -644,7 +657,13 @@
     }
 
     footprints(p) {
-      if (inPond(p.x, p.y)) return;
+      if (inPond(p.x, p.y)) { // על הקרח: אין עקבות, יש ניצוצות החלקה
+        if (Math.random() < 0.45) {
+          const e = this.add.particles(p.x, p.y, 'flake', { speed: { min: 20, max: 70 }, lifespan: 420, scale: { start: 0.55, end: 0 }, alpha: { start: 0.95, end: 0 }, tint: [0xffffff, 0xbfefff, 0x9fe0ff], emitting: false }).setDepth(p.y - 1);
+          e.explode(3); this.time.delayedCall(500, () => e.destroy());
+        }
+        return;
+      }
       if (!p.lastPrint) { p.lastPrint = { x: p.x, y: p.y }; return; }
       const d = dist(p.x, p.y, p.lastPrint.x, p.lastPrint.y);
       if (d < 17) return;
@@ -777,8 +796,8 @@
       // תנועה – אותם חוקים כמו לשחקנית (כולל החלקה על הקרח)
       const len = Math.hypot(dx, dy) || 1; dx /= len; dy /= len;
       const ice = inPond(p.x, p.y);
-      const f = 1 - Math.exp(-(ice ? 2.4 : 15) * dt);
-      const sp = canAct && (dx || dy) ? SPEED * BOT.speed * (ice ? 1.15 : 1) : 0;
+      const f = 1 - Math.exp(-(ice ? ICE_ACCEL : 15) * dt);
+      const sp = canAct && (dx || dy) ? SPEED * BOT.speed * (ice ? ICE_SPEED : 1) : 0;
       p.vx += (dx * sp - p.vx) * f; p.vy += (dy * sp - p.vy) * f;
       const ox = p.x, oy = p.y;
       p.x += p.vx * dt; p.y += p.vy * dt;
@@ -972,7 +991,7 @@
           this.floatText(sender.x, sender.y - 100, 'פגיעה!', '#ffe066');
           const thrower = this.players[d.by];
           if (thrower) this.floatText(thrower.x, thrower.y - 100, '+1', '#ffe066');
-          if (d.by === this.meId) this.addCoins(COIN_PER_HIT);
+          if (d.by === this.meId) { this.addCoins(COIN_PER_HIT); if (Arena.onMyHit) Arena.onMyHit(); }
           if (this.isHost) this.awardPoint(d.by);
           break;
         }
